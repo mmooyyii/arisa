@@ -138,6 +138,13 @@ data class Config(
     companion object {
         private val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))
 
-        fun load(file: File): Config = yaml.decodeFromString(serializer(), file.readText())
+        /** key 也可以用环境变量传, 优先级高于配置文件. */
+        fun load(file: File, env: Map<String, String> = System.getenv()): Config {
+            val config = if (file.exists()) yaml.decodeFromString(serializer(), file.readText()) else Config()
+            return config.copy(
+                tmdb = config.tmdb.copy(apiKey = env["ARISA_TMDB_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.tmdb.apiKey),
+                ai = config.ai.copy(apiKey = env["ARISA_AI_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.ai.apiKey),
+            )
+        }
     }
 }

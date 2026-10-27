@@ -181,7 +181,10 @@ fun main(argv: Array<String>) {
 }
 
 private fun scraper(config: Config, state: StateStore): Scraper {
-    require(config.tmdb.apiKey.isNotBlank()) { "config.yaml 里没有 tmdb.api_key" }
+    require(config.tmdb.apiKey.isNotBlank()) {
+        "没有 TMDB API Key. 在 https://www.themoviedb.org/settings/api 申请后, " +
+            "填到 ${File(home, "config.yaml")} 的 tmdb.api_key, 或设置环境变量 ARISA_TMDB_API_KEY"
+    }
     val drive = QuarkDrive(web(state), config.rateLimit)
     val tmdbHttp = httpClient(config.tmdb.proxy)
     val tmdb = Tmdb(config.tmdb.apiKey, tmdbHttp, File(home, "cache/tmdb"))

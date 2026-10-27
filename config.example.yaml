@@ -1,5 +1,6 @@
 # 复制到 ~/.arisa/config.yaml
 # 登录态 (cookie/token) 不放这里, 用 `arisa-scraper login` 存到 ~/.arisa/state.json
+# key 也可以不写在这里, 改用环境变量 ARISA_TMDB_API_KEY / ARISA_AI_API_KEY
 
 defaults:
   output: index+nfo          # index / index+nfo / index+full

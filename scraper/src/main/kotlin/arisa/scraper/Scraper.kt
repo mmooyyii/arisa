@@ -121,6 +121,8 @@ class Scraper(
             val eff = effective.getValue(u)
             matches[u] = try {
                 match(u, eff, previousMatch, aiParsed[u])
+            } catch (e: TmdbAuthException) {
+                throw e
             } catch (e: Exception) {
                 log("识别失败 ${u.displayPath}: ${e.message}")
                 null

@@ -12,12 +12,12 @@ TV 和 mac mini 不直接通信, TV 只需要扫码登录夸克.
 
 ## 模块
 
-| 模块 | 说明 |
-|---|---|
-| `quark` | 夸克客户端. `QuarkTvClient`: TV 端开放接口 (扫码登录、列目录、直链、转码流); `QuarkWebClient`: 网页端 Cookie 接口 (额外支持上传/删除). 参考 OpenList 的 quark_uc_tv / quark_uc 驱动 |
-| `library` | 索引数据结构 `Library`, 两端共用 |
-| `scraper` | 刮削器命令行, 跑在 mac mini 上 |
-| `app` | 安卓 TV App (Compose for TV + Media3) |
+| 模块        | 说明                                                                                                                                       |
+|-----------|------------------------------------------------------------------------------------------------------------------------------------------|
+| `quark`   | 夸克客户端. `QuarkTvClient`: TV 端开放接口 (扫码登录、列目录、直链、转码流); `QuarkWebClient`: 网页端 Cookie 接口 (额外支持上传/删除). 参考 OpenList 的 quark_uc_tv / quark_uc 驱动 |
+| `library` | 索引数据结构 `Library`, 两端共用                                                                                                                   |
+| `scraper` | 刮削器命令行, 跑在 mac mini 上                                                                                                                    |
+| `app`     | 安卓 TV App (Compose for TV + Media3)                                                                                                      |
 
 ## 刮削器
 
@@ -36,6 +36,7 @@ $S daemon                # 常驻定时扫描
 AI 只做"解析文件名"和"在 TMDB 候选里选一个", 不生成元数据.
 
 输出模式 (`output`, 可按目录覆盖):
+
 - `index`: 只写汇总索引
 - `index+nfo`: 加电影 NFO 和 tvshow.nfo, 图片写远程 URL
 - `index+full`: 加单集 NFO 和全部图片

@@ -29,6 +29,8 @@ fun httpClient(proxy: String?): OkHttpClient = OkHttpClient.Builder()
  * TMDB v3 接口, 响应缓存在磁盘上 (默认 7 天), 重复扫描不重复请求.
  * api_key 支持 v3 key 和 v4 read access token (eyJ 开头).
  */
+class TmdbAuthException(message: String) : IllegalStateException(message)
+
 interface TmdbApi {
     fun searchMovie(query: String, year: Int?, language: String): List<Tmdb.SearchResult>
     fun searchTv(query: String, year: Int?, language: String): List<Tmdb.SearchResult>
@@ -107,6 +109,8 @@ class Tmdb(
                     cacheFile.writeText(body)
                     return body
                 }
+                // key 不对时每个请求都会失败, 直接中止, 不要把所有片子都当成没识别
+                if (resp.code == 401) throw TmdbAuthException("TMDB API Key 无效 (401), 检查 tmdb.api_key")
                 // 429 限流时退避重试
                 if (resp.code == 429 && attempt < 5) {
                     Thread.sleep(1000L shl attempt)

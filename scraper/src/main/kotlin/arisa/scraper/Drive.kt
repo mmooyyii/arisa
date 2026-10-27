@@ -17,6 +17,9 @@ interface Drive {
     /** 网盘最近的变化 (转存、上传…), 不支持的实现返回空. */
     fun recent(): List<arisa.quark.RecentRecord> = emptyList()
 
+    /** 最近删除的 (回收站), 不支持的实现返回空. */
+    fun recycled(): List<arisa.quark.RecycledFile> = emptyList()
+
     /** 夸克为视频生成的缩略图. */
     fun thumbnail(file: QuarkFile): ByteArray = error("不支持缩略图")
 
@@ -55,6 +58,7 @@ class QuarkDrive(private val client: QuarkWebClient, rate: RateLimit) : Drive {
     override fun mkdir(parentFid: String, name: String) = retry { writeLimiter.acquire(); client.mkdir(parentFid, name) }
     override fun rename(fid: String, newName: String) = retry { writeLimiter.acquire(); client.rename(fid, newName) }
     override fun recent() = retry { listLimiter.acquire(); client.recent() }
+    override fun recycled() = retry { listLimiter.acquire(); client.recycled() }
     override fun thumbnail(file: QuarkFile) =
         retry { client.thumbnail(file.thumbnail ?: throw IllegalStateException("夸克没有为这个文件生成缩略图")) }
 
@@ -158,6 +162,13 @@ class CachingDrive(private val inner: Drive, private val file: java.io.File) : D
         if (fid in listings) stale += fid
     }
 
+    /** 目录被删了: 丢掉它的列表. */
+    @Synchronized
+    fun forget(fid: String) {
+        listings.remove(fid)
+        stale.remove(fid)
+    }
+
     @Synchronized
     fun invalidateAll() {
         listings.clear()
@@ -174,6 +185,7 @@ class CachingDrive(private val inner: Drive, private val file: java.io.File) : D
 
     override fun download(fid: String) = inner.download(fid)
     override fun recent() = inner.recent()
+    override fun recycled() = inner.recycled()
     override fun thumbnail(file: QuarkFile) = inner.thumbnail(file)
 
     override fun upload(parentFid: String, name: String, bytes: ByteArray): String =

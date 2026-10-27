@@ -310,7 +310,7 @@ class Service(
     // ---------- 盯网盘 ----------
 
     @Serializable
-    private data class WatchState(val lastSeen: Long = 0, val lastFullScan: String? = null)
+    private data class WatchState(val lastSeen: Long = 0, val lastFullScan: String? = null, val lastRecycled: Long = 0)
 
     private fun watchState() = runCatching { json.decodeFromString(WatchState.serializer(), watchFile.readText()) }.getOrDefault(WatchState())
     private fun saveWatch(s: WatchState) = watchFile.writeText(json.encodeToString(WatchState.serializer(), s))
@@ -320,8 +320,8 @@ class Service(
      * 夸克的 Cookie 每次请求都会续期, 这里定时请求也起到保活作用.
      */
     fun poll() {
-        val records = try {
-            drive.recent()
+        val (records, recycled) = try {
+            drive.recent() to drive.recycled()
         } catch (e: LoginExpiredException) {
             loginExpired(e)
             return
@@ -333,32 +333,49 @@ class Service(
             submit(Job.Scan(false, "登录恢复"))
         }
         val ws = watchState()
-        val latest = records.maxOfOrNull { it.time } ?: ws.lastSeen
-        val fresh = records.filter { it.time > ws.lastSeen && it.source !in IGNORED_SOURCES }
+        val latest = maxOf(records.maxOfOrNull { it.time } ?: 0, ws.lastSeen)
+        val latestRecycled = maxOf(recycled.maxOfOrNull { it.time } ?: 0, ws.lastRecycled)
         if (ws.lastSeen == 0L) {
             // 第一次运行只记下位置, 启动时本来就会扫描
-            saveWatch(ws.copy(lastSeen = latest))
+            saveWatch(ws.copy(lastSeen = latest, lastRecycled = latestRecycled))
             return
         }
+
+        // 转存、上传: 父目录重新列; 新出现的目录本来就不在缓存里, 扫描时会列
+        val added = records.filter { it.time > ws.lastSeen && it.source !in IGNORED_SOURCES }
+            .flatMap { it.files }.filter { !isOwnFile(it.name) }
         var touched = 0
-        for (r in fresh) {
-            for (f in r.files) {
-                // 自己写的 NFO、索引不算
-                if (f.name.endsWith(".nfo", true) || f.name.startsWith("library-") || f.name.startsWith("mapping")) continue
-                val parent = f.parentFid ?: continue
-                if (drive.isListed(parent)) {
-                    drive.invalidate(parent)
-                    touched++
-                }
-                if (f.isDir) drive.invalidate(f.fid)
+        for (f in added) {
+            val parent = f.parentFid ?: continue
+            if (drive.isListed(parent)) {
+                drive.invalidate(parent)
+                touched++
             }
         }
-        if (touched > 0) {
-            log("网盘有 ${fresh.size} 条新动态 (${fresh.map { it.source }.distinct().joinToString()}), 涉及 $touched 个目录")
+        // 删除: 「最近」里看不到, 看回收站
+        val deleted = recycled.filter { it.time > ws.lastRecycled && !isOwnFile(it.name) }
+        for (f in deleted) {
+            val parent = f.parentFid ?: continue
+            if (drive.isListed(parent)) {
+                drive.invalidate(parent)
+                touched++
+            }
+            if (f.isDir) drive.forget(f.fid)
         }
-        if (touched > 0) submit(Job.Scan(false, "网盘有变化"))
-        saveWatch(ws.copy(lastSeen = maxOf(latest, ws.lastSeen)))
+        if (touched > 0) {
+            val what = listOfNotNull(
+                added.size.takeIf { it > 0 }?.let { "新增 $it 个" },
+                deleted.size.takeIf { it > 0 }?.let { "删除 $it 个" },
+            ).joinToString(", ")
+            log("网盘有变化: $what, 涉及 $touched 个目录")
+            submit(Job.Scan(false, "网盘有变化"))
+        }
+        saveWatch(ws.copy(lastSeen = latest, lastRecycled = latestRecycled))
     }
+
+    /** 自己写的 NFO、索引、映射表备份, 它们的增删不用触发扫描. */
+    private fun isOwnFile(name: String) =
+        name.endsWith(".nfo", true) || name.startsWith("library-") || name.startsWith("mapping")
 
     /** 每天在配置的钟点全量扫一次: 移动、删除在「最近」里看不到. */
     fun dailyFullScan() {
@@ -410,5 +427,6 @@ private class LazyDrive(private val factory: () -> Drive) : Drive {
     override fun mkdir(parentFid: String, name: String) = d().mkdir(parentFid, name)
     override fun rename(fid: String, newName: String) = d().rename(fid, newName)
     override fun recent() = d().recent()
+    override fun recycled() = d().recycled()
     override fun thumbnail(file: arisa.quark.QuarkFile) = d().thumbnail(file)
 }

@@ -71,6 +71,13 @@ class QuarkWebClient(
         return resp.data.list.map { r -> RecentRecord(r.source, r.maxTm, r.files.map { it.toQuarkFile() }) }
     }
 
+    /** 回收站, 最近删除的在前. 「最近」里看不到删除, 靠这个发现. */
+    fun recycled(size: Int = 50): List<RecycledFile> {
+        val obj = request("/file/recycle/list", "GET", mapOf("_page" to "1", "_size" to size.toString()))
+        val resp = json.decodeFromJsonElement(RecycleResp.serializer(), obj)
+        return resp.data.list.map { RecycledFile(it.fid, unescapeHtml(it.fileName), it.fileType == 0, it.pdirFid?.ifEmpty { null }, it.moveRecycleAt) }
+    }
+
     private fun WebFile.toQuarkFile() =
         QuarkFile(fid, unescapeHtml(fileName), !file, size, category, updatedAt, thumbnail?.ifEmpty { null }, pdirFid?.ifEmpty { null })
 
@@ -352,6 +359,21 @@ class QuarkWebClient(
         val source: String = "",
         @SerialName("max_tm") val maxTm: Long = 0,
         val files: List<WebFile> = emptyList(),
+    )
+
+    @Serializable
+    private data class RecycleResp(val data: RecycleData = RecycleData())
+
+    @Serializable
+    private data class RecycleData(val list: List<RecycleItem> = emptyList())
+
+    @Serializable
+    private data class RecycleItem(
+        val fid: String,
+        @SerialName("file_name") val fileName: String = "",
+        @SerialName("file_type") val fileType: Int = 1,
+        @SerialName("pdir_fid") val pdirFid: String? = null,
+        @SerialName("move_recycle_at") val moveRecycleAt: Long = 0,
     )
 
     @Serializable

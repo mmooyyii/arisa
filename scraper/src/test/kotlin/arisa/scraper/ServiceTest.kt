@@ -3,6 +3,7 @@ package arisa.scraper
 import arisa.library.LibraryCodec
 import arisa.quark.QuarkFile
 import arisa.quark.RecentRecord
+import arisa.quark.RecycledFile
 import java.io.File
 import java.nio.file.Files
 import kotlin.test.Test
@@ -13,9 +14,11 @@ import kotlin.test.assertTrue
 private class TestDrive(root: File) : Drive by LocalDrive(root) {
     val lists = mutableListOf<String>()
     val records = mutableListOf<RecentRecord>()
+    val trash = mutableListOf<RecycledFile>()
     private val local = LocalDrive(root)
     override fun list(fid: String): List<QuarkFile> = local.list(fid).also { lists += fid }
     override fun recent() = records.toList()
+    override fun recycled() = trash.toList()
 }
 
 class ServiceTest {
@@ -156,5 +159,21 @@ class ServiceTest {
         // 同一条动态不会重复触发
         e.service.poll()
         assertEquals(false, e.service.runNext())
+
+        // 删掉一集: 回收站里出现, 那个目录重新列, 索引里少一集
+        File(e.root, "没看/漫长的季节 (2023)/E01.mkv").delete()
+        e.drive.trash += RecycledFile("没看/漫长的季节 (2023)/E01.mkv", "E01.mkv", false, "没看/漫长的季节 (2023)", 10)
+        e.service.poll()
+        e.runAll()
+        val latest = File(e.root, ".arisa").listFiles()!!.filter { LibraryCodec.isIndexFile(it.name) }.maxBy { it.name }
+        assertEquals(listOf(2), LibraryCodec.decode(latest.readBytes()).items.single().seasons.single().episodes.map { it.episode })
+
+        // 整部删掉: 作品从索引里消失
+        File(e.root, "没看/漫长的季节 (2023)").deleteRecursively()
+        e.drive.trash += RecycledFile("没看/漫长的季节 (2023)", "漫长的季节 (2023)", true, "没看", 11)
+        e.service.poll()
+        e.runAll()
+        val last = File(e.root, ".arisa").listFiles()!!.filter { LibraryCodec.isIndexFile(it.name) }.maxBy { it.name }
+        assertEquals(0, LibraryCodec.decode(last.readBytes()).items.size)
     }
 }

@@ -26,6 +26,9 @@ data class QuarkFile(
 )
 
 /** "最近" 里的一条记录: 一次转存、上传、播放等, 带涉及的文件. */
+/** 回收站里的一条: 被删掉的文件/目录, [time] 是删除时间. */
+data class RecycledFile(val fid: String, val name: String, val isDir: Boolean, val parentFid: String?, val time: Long)
+
 data class RecentRecord(
     /** SAVE_SHARE / UPLOAD_FILE / PLAY / VIEW_FILE ... */
     val source: String,

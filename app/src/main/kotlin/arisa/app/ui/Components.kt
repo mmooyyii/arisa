@@ -218,7 +218,8 @@ fun qualityTags(files: List<MediaFile>): List<String> {
             Regex("1080p").containsMatchIn(names) -> add("1080P")
         }
         when {
-            Regex("\\b(dv|dovi|dolby.?vision)\\b").containsMatchIn(names) -> add("杜比视界")
+            // 「4K DV杜比视界」: DV 后面紧跟汉字, \\b 不算边界, 用前后不是字母判断
+            Regex("杜比视界|dolby.?vision|dovi|(?<![a-z])dv(?![a-z])").containsMatchIn(names) -> add("杜比视界")
             Regex("hdr").containsMatchIn(names) -> add("HDR")
         }
         if (Regex("atmos").containsMatchIn(names)) add("ATMOS")

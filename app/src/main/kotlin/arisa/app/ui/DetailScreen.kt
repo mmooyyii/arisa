@@ -1,5 +1,10 @@
 package arisa.app.ui
 
+import kotlinx.coroutines.launch
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -68,6 +73,8 @@ fun DetailScreen(
     val item = library?.items?.firstOrNull { it.id == id } ?: return
 
     val playFocus = remember { FocusRequester() }
+    val listState = rememberLazyListState()
+    val scope = rememberCoroutineScope()
     LaunchedEffect(id) { runCatching { playFocus.requestFocus() } }
 
     // 默认播哪个文件: 电影取第一个版本; 剧集取看到一半的那集, 或者看完那集的下一集, 否则第一集
@@ -80,26 +87,36 @@ fun DetailScreen(
         Backdrop(item, dim = 1f)
         CompositionLocalProvider(LocalBringIntoViewSpec provides MinimalBringIntoView) {
             LazyColumn(
+                state = listState,
                 contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 72.dp, bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(28.dp),
                 modifier = Modifier.fillMaxSize(),
             ) {
                 item(key = "header") {
-                    Column(Modifier.width(600.dp)) {
-                        LogoOrTitle(item, maxHeight = 110.dp, maxWidth = 460.dp)
-                        if (item.logo != null && item.originalTitle == null) Spacer(Modifier.height(4.dp))
-                        item.originalTitle?.let {
-                            Spacer(Modifier.height(6.dp))
-                            Text(it, style = MaterialTheme.typography.labelMedium, color = Palette.TextTertiary)
-                        }
-                        Spacer(Modifier.height(14.dp))
-                        MetaLine(item, item.files + episodes.flatMap { it.files }.take(3))
-                        Spacer(Modifier.height(14.dp))
-                        item.overview?.let {
-                            Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                    Column {
+                        Column(Modifier.width(600.dp)) {
+                            LogoOrTitle(item, maxHeight = 110.dp, maxWidth = 460.dp)
+                            if (item.logo != null && item.originalTitle == null) Spacer(Modifier.height(4.dp))
+                            item.originalTitle?.let {
+                                Spacer(Modifier.height(6.dp))
+                                Text(it, style = MaterialTheme.typography.labelMedium, color = Palette.TextTertiary)
+                            }
+                            Spacer(Modifier.height(14.dp))
+                            MetaLine(item, item.files + episodes.flatMap { it.files }.take(3))
+                            Spacer(Modifier.height(14.dp))
+                            item.overview?.let {
+                                Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
+                            }
                         }
                         Spacer(Modifier.height(24.dp))
-                        Row(horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                        // 按钮单独一行, 不受上面 600dp 的限宽 (多版本时放不下会被裁掉); 版本多了可以横向滚.
+                        // 焦点回到这一行时滚回顶部, 不然往下再往上时标题还在屏幕外
+                        Row(
+                            horizontalArrangement = Arrangement.spacedBy(14.dp),
+                            modifier = Modifier
+                                .horizontalScroll(rememberScrollState())
+                                .onFocusChanged { if (it.hasFocus) scope.launch { listState.animateScrollToItem(0) } },
+                        ) {
                             if (targetFid != null) {
                                 val label = when {
                                     resumeProgress != null && !resumeProgress.finished && resumeProgress.positionMs > 60_000 ->
@@ -138,7 +155,10 @@ fun DetailScreen(
 
                 if (item.cast.isNotEmpty()) {
                     item(key = "cast") {
-                        Column {
+                        // 焦点进来时整行滚进屏幕, 只按头像滚的话名字会被底边切掉
+                        Column(Modifier.onFocusChanged {
+                            if (it.hasFocus) scope.launch { listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
+                        }) {
                             SectionTitle("演职员")
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                                 items(item.cast) { c ->

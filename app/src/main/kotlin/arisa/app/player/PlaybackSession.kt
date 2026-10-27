@@ -92,10 +92,11 @@ class PlaybackSession(
                 .setEnableDecoderFallback(true)
         )
         .setLoadControl(
-            // 原盘码率高, 按字节限制缓冲, 免得电视盒子内存不够
+            // 原盘码率高, 按字节限制缓冲: 缓冲在 Java 堆里, 电视的堆上限一般只有 192MB,
+            // 取四成 (分段下载还要占 40MB 左右), 写死 200MB 会在网速快时把堆撑爆
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(15_000, 60_000, 2_500, 5_000)
-                .setTargetBufferBytes(200 * 1024 * 1024)
+                .setTargetBufferBytes((Runtime.getRuntime().maxMemory() * 0.4).toInt())
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .setBackBuffer(20_000, true)
                 .build()

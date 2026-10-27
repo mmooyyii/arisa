@@ -14,6 +14,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -109,13 +110,16 @@ fun DetailScreen(
                                 Text(it, style = MaterialTheme.typography.bodyMedium, maxLines = 4, overflow = TextOverflow.Ellipsis)
                             }
                         }
-                        Spacer(Modifier.height(24.dp))
+                        Spacer(Modifier.height(16.dp))
                         // 按钮单独一行, 不受上面 600dp 的限宽 (多版本时放不下会被裁掉); 版本多了可以横向滚.
+                        // 滚动区域会裁掉超出的部分, 四周留 8dp 给按钮聚焦放大, 再整体左移 8dp 和上面的字对齐.
                         // 焦点回到这一行时滚回顶部, 不然往下再往上时标题还在屏幕外
                         Row(
                             horizontalArrangement = Arrangement.spacedBy(14.dp),
                             modifier = Modifier
+                                .offset(x = (-8).dp)
                                 .horizontalScroll(rememberScrollState())
+                                .padding(8.dp)
                                 .onFocusChanged { if (it.hasFocus) scope.launch { listState.animateScrollToItem(0) } },
                         ) {
                             if (targetFid != null) {

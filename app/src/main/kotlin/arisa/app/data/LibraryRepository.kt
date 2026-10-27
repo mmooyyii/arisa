@@ -60,7 +60,7 @@ class LibraryRepository(
             return@withContext
         }
         if (cacheFile.exists()) {
-            _library.value = runCatching { LibraryCodec.decode(cacheFile.readBytes()) }.getOrNull()
+            _library.value = runCatching { LibraryCodec.decode(cacheFile.readBytes()).playableFirst() }.getOrNull()
         }
     }
 
@@ -78,7 +78,7 @@ class LibraryRepository(
                     if (latest != cacheNameFile.takeIf { it.exists() }?.readText() || _library.value == null) {
                         val fid = files.first { it.name == latest }.fid
                         val bytes = fetch(client.downloadLink(fid))
-                        val lib = LibraryCodec.decode(bytes)
+                        val lib = LibraryCodec.decode(bytes).playableFirst()
                         cacheFile.writeBytes(bytes)
                         cacheNameFile.writeText(latest)
                         _library.value = lib
@@ -166,3 +166,20 @@ class LibraryRepository(
         const val DEMO_VIDEO = "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4"
     }
 }
+
+/**
+ * 同一集 / 同一部有多个版本时, 把电视硬解不了的版本排到后面, 各处取第一个文件就能播.
+ * 4:4:4 色度的 HEVC (压制组标 yuv444p10le / Hi444) 几乎没有硬件解码器支持, 硬接会出绿屏.
+ */
+private fun Library.playableFirst(): Library {
+    fun List<MediaFile>.sorted() = sortedBy { CHROMA_444.containsMatchIn(it.path) }
+    return copy(items = items.map { item ->
+        item.copy(
+            files = item.files.sorted(),
+            seasons = item.seasons.map { s -> s.copy(episodes = s.episodes.map { e -> e.copy(files = e.files.sorted()) }) },
+        )
+    })
+}
+
+private val CHROMA_444 = Regex("""yuv444|444p|hi444""", RegexOption.IGNORE_CASE)
+

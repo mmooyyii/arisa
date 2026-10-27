@@ -60,7 +60,6 @@ import quarkflix.library.tmdbImage
 fun DetailScreen(
     id: String,
     onPlay: (fid: String, fromStart: Boolean) -> Unit,
-    onOpen: (String) -> Unit,
     onSearch: (String) -> Unit,
 ) {
     val app = QuarkflixApp.instance
@@ -167,22 +166,6 @@ fun DetailScreen(
                                         }
                                     }
                                 }
-                            }
-                        }
-                    }
-                }
-
-                // 同类型推荐
-                val related = library?.items.orEmpty()
-                    .filter { it.id != item.id && it.genres.intersect(item.genres.toSet()).isNotEmpty() }
-                    .sortedByDescending { it.genres.intersect(item.genres.toSet()).size * 10 + (it.rating ?: 0.0) }
-                    .take(15)
-                if (related.isNotEmpty()) {
-                    item(key = "related") {
-                        Column {
-                            SectionTitle("相关推荐")
-                            LazyRow(horizontalArrangement = Arrangement.spacedBy(18.dp)) {
-                                items(related, key = { it.id }) { PosterCard(it, onClick = { onOpen(it.id) }) }
                             }
                         }
                     }

@@ -91,7 +91,6 @@ class MainActivity : ComponentActivity() {
             is Screen.Detail -> DetailScreen(
                 id = screen.id,
                 onPlay = { fid, fromStart -> play(screen.id, fid, fromStart) },
-                onOpen = { stack += Screen.Detail(it) },
                 onSearch = { stack += Screen.Search(it) },
             )
             is Screen.Search -> SearchScreen(screen.query, onOpen = { stack += Screen.Detail(it) })

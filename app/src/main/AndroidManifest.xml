@@ -7,7 +7,6 @@
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
     <application
-        android:largeHeap="true"
         android:name=".ArisaApp"
         android:allowBackup="false"
         android:banner="@drawable/banner"

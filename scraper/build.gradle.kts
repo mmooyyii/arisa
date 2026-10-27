@@ -16,6 +16,8 @@ dependencies {
     implementation(project(":quark"))
     implementation(project(":library"))
     implementation("com.charleskorn.kaml:kaml:0.104.0")
+    // 扫码登录时在终端里画二维码
+    implementation("com.google.zxing:core:3.5.3")
     testImplementation(kotlin("test"))
 }
 

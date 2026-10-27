@@ -1,5 +1,9 @@
 package arisa.scraper
 
+import com.google.zxing.qrcode.QRCodeWriter
+import com.google.zxing.EncodeHintType
+import com.google.zxing.BarcodeFormat
+import arisa.quark.QuarkWebLogin
 import arisa.library.Library
 import arisa.library.LibraryCodec
 import arisa.quark.QuarkTvClient
@@ -23,7 +27,7 @@ private const val USAGE = """arisa-scraper <命令> [参数]
 识别 ("这是哪部片") 由 skill 判断, 这里只提供确定性的工具. 输出 JSON 的命令供 skill 调用.
 
 登录:
-  login [cookie]                网页端 Cookie 登录, 不带参数则从 stdin 读
+  login [cookie]                不带参数: 终端里显示二维码, 用夸克 App 扫码登录; 带参数: 用网页端 Cookie 登录
   tv-login                      TV 端扫码登录 (验证 TV 接口用)
   whoami                        查看登录状态
 
@@ -66,11 +70,7 @@ fun main(argv: Array<String>) {
     try {
         when (cmd) {
             "login" -> {
-                val cookie = args.firstOrNull() ?: run {
-                    println("粘贴 pan.quark.cn 的 Cookie 后回车:")
-                    readlnOrNull()?.trim().orEmpty()
-                }
-                require(cookie.isNotBlank()) { "cookie 为空" }
+                val cookie = args.firstOrNull() ?: qrLogin()
                 val client = QuarkWebClient(cookie)
                 val member = client.member()
                 state.update { it.copy(cookie = client.currentCookie) }
@@ -321,6 +321,39 @@ private fun tmdbCommand(args: MutableList<String>, config: Config) {
         }
         "show" -> println(json.encodeToString(JsonObject.serializer(), tmdbShowJson(tmdb, args[0], args[1].toInt(), lang)))
         else -> error("用法: tmdb search <片名> [--tv|--movie] [--year Y] / tmdb show <movie|tv> <id>")
+    }
+}
+
+/** 网页版扫码登录: 终端里画二维码 (SSH 远程也能扫), 扫完返回 Cookie. */
+private fun qrLogin(): String {
+    val web = QuarkWebLogin()
+    val qr = web.start()
+    println(terminalQr(qr.qrContent))
+    println("用夸克 App 扫上面的二维码并确认登录 (4 分钟内有效)")
+    repeat(120) {
+        Thread.sleep(2000)
+        web.poll(qr.token)?.let { return it }
+    }
+    error("扫码超时, 重新运行 login")
+}
+
+/** 用上下半块字符画二维码, 一个字符表示上下两个点, 白底黑块, 留一圈白边方便扫. */
+private fun terminalQr(content: String): String {
+    val m = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 0, 0, mapOf(EncodeHintType.MARGIN to 2))
+    return buildString {
+        for (y in 0 until m.height step 2) {
+            for (x in 0 until m.width) {
+                val top = m.get(x, y)
+                val bottom = y + 1 < m.height && m.get(x, y + 1)
+                append(when {
+                    top && bottom -> ' '
+                    top -> '▄'
+                    bottom -> '▀'
+                    else -> '█'
+                })
+            }
+            append('\n')
+        }
     }
 }
 

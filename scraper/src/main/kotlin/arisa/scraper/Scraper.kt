@@ -436,7 +436,7 @@ class Scraper(
         // 每个文件的季/集; 映射里指定了季号的以映射为准
         val located = list.map { (f, entry) ->
             val p = FilenameParser.parse(f.file.name, f.parentNames)
-            Triple(f, entry.season ?: p.season ?: 1, p.episode)
+            Triple(f, entry.season ?: p.season ?: 1, p.episode?.let { it + (entry.episodeOffset ?: 0) })
         }
         // 有的资源按绝对集数编号 (第二季目录里是 26~50 集), 换算成季内集数
         val seasonCounts = d.seasons.filter { it.seasonNumber > 0 }.associate { it.seasonNumber to it.episodeCount }

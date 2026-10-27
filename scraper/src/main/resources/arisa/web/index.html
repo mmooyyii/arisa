@@ -172,6 +172,7 @@ function reviewCard(e, i) {
       <div class="row">
         映射到 <select class="level">${levels.join('')}</select>
         季 <input class="season" type="number" min="0" style="width:64px" placeholder="自动">
+        集数 + <input class="offset" type="number" min="0" style="width:64px" placeholder="0" title="TMDB 把多季合成一季、文件按季内编号时填前面各季的集数">
         <button class="danger" onclick="decideRv(this, 'skip')">不是正片，跳过</button>
         <button onclick="retryRv(this)">重新交给 AI</button>
       </div>
@@ -207,10 +208,11 @@ function decideRv(el, target) {
   const card = cardOf(el), e = card.entry;
   const fid = card.querySelector('.level').value;
   const season = card.querySelector('.season').value;
+  const offset = card.querySelector('.offset').value;
   const dirIdx = (e.work.dirs || []).findIndex(d => d.fid === fid);
   const path = fid === e.work.key ? e.work.path : e.work.path.split('/' + e.work.dirs[0].name)[0] + '/' + e.work.dirs.slice(0, dirIdx + 1).map(d => d.name).join('/');
   if (target === 'skip' && !confirm(`跳过 ${path}？以后不会入库`)) return;
-  act(() => api('/api/decide', { fid, target, season: season === '' ? null : +season, path, key: e.work.key }), '已确认，正在生成索引');
+  act(() => api('/api/decide', { fid, target, season: season === '' ? null : +season, episodeOffset: offset === '' ? null : +offset, path, key: e.work.key }), '已确认，正在生成索引');
 }
 function retryRv(el) { act(() => api('/api/retry', { key: cardOf(el).entry.work.key }), '已交回 AI'); }
 async function searchRv(el) {

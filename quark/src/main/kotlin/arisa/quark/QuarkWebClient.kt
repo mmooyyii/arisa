@@ -225,7 +225,8 @@ class QuarkWebClient(
         val authKey = uploadAuth(pre, authMeta)
         val url = ossUrl(pre).toHttpUrl().newBuilder().addQueryParameter("uploadId", pre.data.uploadId).build()
         val req = Request.Builder().url(url)
-            .post(xml.toRequestBody("application/xml".toMediaType()))
+            // 用字节数组: 字符串版本会给 Content-Type 加上 "; charset=utf-8", 和签名里的对不上
+            .post(xml.toByteArray().toRequestBody("application/xml".toMediaType()))
             .header("Authorization", authKey)
             .header("Content-MD5", contentMd5)
             .header("Content-Type", "application/xml")

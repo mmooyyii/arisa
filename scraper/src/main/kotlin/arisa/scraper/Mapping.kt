@@ -18,6 +18,8 @@ data class MappingEntry(
     val path: String,
     /** 强制季号, 目录名看不出第几季时用. 0 表示特别篇. */
     val season: Int? = null,
+    /** 集数加上这个数. TMDB 把多季合成一季 (如 85 集的第 1 季), 而文件按季内编号时用. */
+    val episodeOffset: Int? = null,
     val note: String? = null,
     /** 谁做的决定: skill / user / nfo / rules */
     val by: String = "skill",

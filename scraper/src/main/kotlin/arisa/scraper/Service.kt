@@ -241,7 +241,9 @@ class Service(
     }
 
     private fun build(scraper: Scraper, scan: Scan) {
-        val (_, report) = scraper.build(scan, store.load(), write = true)
+        val (library, report) = scraper.build(scan, store.load(), write = true)
+        // 本地留一份, 方便查看
+        File(home, "library.json.gz").writeBytes(arisa.library.LibraryCodec.encode(library))
         store.backup()
         lastReport = report
         lastBuild = LocalDateTime.now().format(TIME)
@@ -268,9 +270,9 @@ class Service(
 
     // ---------- 网页上的操作 ----------
 
-    fun decide(fid: String, target: String, season: Int?, path: String, reviewKey: String?) {
+    fun decide(fid: String, target: String, season: Int?, path: String, reviewKey: String?, episodeOffset: Int? = null) {
         require(MappingEntry.validTarget(target)) { "target 要写成 movie:ID / tv:ID / skip" }
-        store.update { it.with(fid, MappingEntry(target, path, season, by = "user")) }
+        store.update { it.with(fid, MappingEntry(target, path, season, episodeOffset, by = "user")) }
         reviewKey?.let(review::remove)
         log("确认 $path → $target${season?.let { " 第 $it 季" } ?: ""}")
         submit(Job.Build("确认了 $path"))
@@ -327,6 +329,8 @@ class Service(
         var touched = 0
         for (r in fresh) {
             for (f in r.files) {
+                // 自己写的 NFO、索引不算
+                if (f.name.endsWith(".nfo", true) || f.name.startsWith("library-") || f.name.startsWith("mapping")) continue
                 val parent = f.parentFid ?: continue
                 if (drive.isListed(parent)) {
                     drive.invalidate(parent)
@@ -335,9 +339,8 @@ class Service(
                 if (f.isDir) drive.invalidate(f.fid)
             }
         }
-        if (fresh.isNotEmpty()) {
-            log("网盘有 ${fresh.size} 条新动态 (${fresh.map { it.source }.distinct().joinToString()})" +
-                if (touched > 0) "" else ", 不在片库里")
+        if (touched > 0) {
+            log("网盘有 ${fresh.size} 条新动态 (${fresh.map { it.source }.distinct().joinToString()}), 涉及 $touched 个目录")
         }
         if (touched > 0) submit(Job.Scan(false, "网盘有变化"))
         saveWatch(ws.copy(lastSeen = maxOf(latest, ws.lastSeen)))

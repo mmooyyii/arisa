@@ -67,6 +67,7 @@ class WebServer(private val service: Service, private val port: Int) {
                         season = b["season"]?.jsonPrimitive?.intOrNull,
                         path = b.str("path") ?: b.str("fid")!!,
                         reviewKey = b.str("key"),
+                        episodeOffset = b["episodeOffset"]?.jsonPrimitive?.intOrNull,
                     )
                     ok(ex)
                 }

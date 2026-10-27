@@ -63,6 +63,12 @@ data class TmdbConfig(
 )
 
 @Serializable
+data class BangumiConfig(
+    /** 可选代理, 如 http://127.0.0.1:7890 (api.bgm.tv 在国内可能被 DNS 污染, 直连不通) */
+    val proxy: String? = null,
+)
+
+@Serializable
 data class RateLimit(
     @SerialName("list_per_sec") val listPerSec: Double = 2.0,
     @SerialName("upload_per_sec") val uploadPerSec: Double = 1.0,
@@ -105,6 +111,7 @@ data class ServeConfig(
 data class Config(
     val defaults: Defaults = Defaults(),
     val tmdb: TmdbConfig = TmdbConfig(),
+    val bangumi: BangumiConfig = BangumiConfig(),
     @SerialName("rate_limit") val rateLimit: RateLimit = RateLimit(),
     val scan: ScanConfig = ScanConfig(),
     val agent: AgentConfig = AgentConfig(),

@@ -24,7 +24,7 @@ class Service(
     private val tmdbFactory: (Config) -> TmdbApi? = { c ->
         if (c.tmdb.apiKey.isBlank()) null else Tmdb(c.tmdb.apiKey, httpClient(c.tmdb.proxy), File(home, "cache/tmdb"))
     },
-    private val bangumiFactory: (Config) -> BangumiApi? = { Bangumi(httpClient(null), File(home, "cache/bangumi")) },
+    private val bangumiFactory: (Config) -> BangumiApi? = { c -> Bangumi(httpClient(c.bangumi.proxy), File(home, "cache/bangumi")) },
     private val imagesFactory: (Config) -> Images? = { c -> Images(httpClient(c.tmdb.proxy), File(home, "cache/images")) },
     private val agentFactory: (Config) -> ((List<PendingWork>) -> AgentRunner.Result)? = { c ->
         if (c.agent.on) AgentRunner(c.agent, home)::run else null

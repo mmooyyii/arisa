@@ -163,7 +163,7 @@ fun main(argv: Array<String>) {
             "tmdb" -> tmdbCommand(args, Config.load(configFile))
             "bangumi" -> {
                 require(args.removeFirstOrNull() == "search") { "用法: bangumi search <名字>" }
-                val api = Bangumi(httpClient(null), File(home, "cache/bangumi"))
+                val api = Bangumi(httpClient(Config.load(configFile).bangumi.proxy), File(home, "cache/bangumi"))
                 println(json.encodeToString(JsonArray.serializer(), bangumiSearchJson(api, args.joinToString(" "))))
             }
             "decide" -> {
@@ -289,7 +289,7 @@ private fun context(configFile: File, state: StateStore, needTmdb: Boolean, quie
     val images = Images(tmdbHttp, File(home, "cache/images"))
     // JSON 输出的命令把日志打到 stderr, 不污染 stdout
     val log: (String) -> Unit = if (quiet) { msg -> System.err.println(msg) } else ::println
-    return Context(Scraper(config, drive, tmdb, images, Bangumi(httpClient(null), File(home, "cache/bangumi")), log), MappingStore(File(home, "mapping.json"), drive), drive)
+    return Context(Scraper(config, drive, tmdb, images, Bangumi(httpClient(config.bangumi.proxy), File(home, "cache/bangumi")), log), MappingStore(File(home, "mapping.json"), drive), drive)
 }
 
 private fun build(ctx: Context, write: Boolean) {

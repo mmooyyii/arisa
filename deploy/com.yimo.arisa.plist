@@ -11,7 +11,7 @@
     </array>
     <key>EnvironmentVariables</key>
     <dict>
-        <!-- 要能找到 java、claude 和 arisa-scraper -->
+        <!-- 要能找到 java 和 arisa-scraper -->
         <key>PATH</key>
         <string>/Users/yimo/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
     </dict>

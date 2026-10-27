@@ -13,14 +13,13 @@ tmdb:
   api_key: ""                # https://www.themoviedb.org/settings/api, v3 key 或 v4 read token 都行
   # proxy: http://127.0.0.1:7890  # 一般不用: 默认走 api.tmdb.org, 国内能直连
 
-# 常驻服务里自动识别用的 AI: 本机 Claude Code 无头模式 (要先在这台机器上登录 claude)
+# 常驻服务里自动识别用的 AI: DeepSeek
+# 没填 api_key 时不启用 AI, 认不出的都放进待确认
 agent:
   enabled: true
-  command: claude            # launchd 下找不到时写绝对路径
-  # model: sonnet            # 不填用 Claude Code 默认
-  effort: low
+  api_key: ""                # https://platform.deepseek.com/api_keys, 也可以用环境变量 ARISA_DEEPSEEK_API_KEY
+  model: deepseek-chat
   batch_size: 20             # 一次交给 AI 的作品数
-  max_budget_usd: 1.0        # 单次运行的花费上限
   timeout_minutes: 30
 
 serve:

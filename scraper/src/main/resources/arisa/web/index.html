@@ -121,7 +121,7 @@ async function loadStatus() {
     chip('待识别视频', s.pendingVideos ?? '-'),
     chip('上次扫描', s.lastScan ?? '-'),
     chip('上次索引', s.lastBuild ?? '-'),
-    chip('AI', s.agentEnabled ? `今天 $${s.agentCostToday.toFixed(2)}` : '关闭'),
+    chip('AI', s.agentEnabled ? `今天 ¥${s.agentCostToday.toFixed(2)}` : '关闭'),
   ].join('');
   $('#n-review').textContent = s.review;
   $('#n-renames').textContent = s.renames;

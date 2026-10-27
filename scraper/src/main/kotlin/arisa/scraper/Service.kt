@@ -27,7 +27,7 @@ class Service(
     private val bangumiFactory: (Config) -> BangumiApi? = { Bangumi(httpClient(null), File(home, "cache/bangumi")) },
     private val imagesFactory: (Config) -> Images? = { c -> Images(httpClient(c.tmdb.proxy), File(home, "cache/images")) },
     private val agentFactory: (Config) -> ((List<PendingWork>) -> AgentRunner.Result)? = { c ->
-        if (c.agent.enabled) AgentRunner(c.agent, home)::run else null
+        if (c.agent.on) AgentRunner(c.agent, home)::run else null
     },
 ) {
     private val driveFactory = driveFactory ?: { c ->
@@ -85,7 +85,7 @@ class Service(
         pendingWorks = pendingWorks,
         review = review.load().size,
         renames = renamePlans().count { it.skipped == null },
-        agentEnabled = runCatching { config().agent.enabled }.getOrDefault(false),
+        agentEnabled = runCatching { config().agent.on }.getOrDefault(false),
         agentCostToday = costToday,
     )
 
@@ -206,8 +206,8 @@ class Service(
             File(home, "pending.json").writeText(json.encodeToString(ListSerializer(PendingWork.serializer()), batch))
             log("交给 AI 识别 ${batch.size} 部")
             val result = agent(batch)
-            result.costUsd?.let(::addCost)
-            val cost = result.costUsd?.let { " 花费 $%.3f".format(it) } ?: ""
+            result.costCny?.let(::addCost)
+            val cost = result.costCny?.let { " 花费 ¥%.3f".format(it) } ?: ""
             log("AI ${if (result.ok) "完成" else "出错"}$cost: ${result.summary.lines().firstOrNull().orEmpty().take(200)}")
 
             // AI 没处理的放进待确认, 免得下次又交给它
@@ -237,10 +237,10 @@ class Service(
         return batch.mapTo(mutableSetOf()) { it.key }
     }
 
-    private fun addCost(usd: Double) {
+    private fun addCost(cny: Double) {
         val today = java.time.LocalDate.now().toString()
         if (today != costDay) { costDay = today; costToday = 0.0 }
-        costToday += usd
+        costToday += cny
     }
 
     private fun buildAll() {

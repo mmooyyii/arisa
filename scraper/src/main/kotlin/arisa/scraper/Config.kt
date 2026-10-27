@@ -74,22 +74,22 @@ data class ScanConfig(
     @SerialName("keep_indexes") val keepIndexes: Int = 5,
 )
 
-/** 常驻服务里自动识别用的 AI (Claude Code 无头模式). */
+/** 常驻服务里自动识别用的 AI (DeepSeek). */
 @Serializable
 data class AgentConfig(
     val enabled: Boolean = true,
-    /** claude 可执行文件. */
-    val command: String = "claude",
-    /** 模型, 为空用 Claude Code 的默认. */
-    val model: String? = null,
-    val effort: String = "low",
+    /** DeepSeek API key, 也可以用环境变量 ARISA_DEEPSEEK_API_KEY. 为空时不启用 AI. */
+    @SerialName("api_key") val apiKey: String = "",
+    /** 花费按 Flash 的价格算, 换成 pro 等更贵的模型时网页上的花费会偏低. */
+    val model: String = "deepseek-chat",
     /** 一次交给 AI 的作品数. */
     @SerialName("batch_size") val batchSize: Int = 20,
-    /** 单次运行的花费上限 (美元), 超出 Claude Code 会停下. */
-    @SerialName("max_budget_usd") val maxBudgetUsd: Double = 1.0,
     /** 单次运行的时间上限. */
     @SerialName("timeout_minutes") val timeoutMinutes: Int = 30,
-)
+) {
+    /** 打开了并且有 key. */
+    val on get() = enabled && apiKey.isNotBlank()
+}
 
 /** 常驻服务. */
 @Serializable
@@ -136,6 +136,7 @@ data class Config(
             val config = if (file.exists()) yaml.decodeFromString(serializer(), file.readText()) else Config()
             return config.copy(
                 tmdb = config.tmdb.copy(apiKey = env["ARISA_TMDB_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.tmdb.apiKey),
+                agent = config.agent.copy(apiKey = env["ARISA_DEEPSEEK_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.agent.apiKey),
             )
         }
     }

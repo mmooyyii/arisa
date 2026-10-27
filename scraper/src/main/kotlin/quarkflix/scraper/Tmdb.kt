@@ -83,7 +83,8 @@ class Tmdb(
     private fun optional(key: String, value: Any?) = if (value == null) emptyMap() else mapOf(key to value.toString())
 
     private fun get(path: String, query: Map<String, String>): String {
-        val url = "https://api.themoviedb.org/3$path".toHttpUrl().newBuilder().apply {
+        // api.themoviedb.org 在国内不通, 备用域名 api.tmdb.org 可以直连
+        val url = "https://api.tmdb.org/3$path".toHttpUrl().newBuilder().apply {
             query.toSortedMap().forEach { (k, v) -> addQueryParameter(k, v) }
         }.build()
         val cacheFile = File(cacheDir, sha1(url.toString()) + ".json")

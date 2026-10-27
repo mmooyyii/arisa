@@ -11,7 +11,7 @@ defaults:
 
 tmdb:
   api_key: ""                # https://www.themoviedb.org/settings/api, v3 key 或 v4 read token 都行
-  proxy: http://127.0.0.1:7890   # api.themoviedb.org 国内要代理 (mac mini 上的 mihomo)
+  # proxy: http://127.0.0.1:7890  # 一般不用: 默认走 api.tmdb.org, 国内能直连
 
 ai:
   provider: deepseek         # none / deepseek / anthropic / openai (OpenAI 兼容, 如 Ollama)

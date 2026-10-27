@@ -66,7 +66,7 @@ data class Defaults(
 @Serializable
 data class TmdbConfig(
     @SerialName("api_key") val apiKey: String = "",
-    /** api.themoviedb.org 在国内要代理, 如 http://127.0.0.1:7890 */
+    /** 可选代理, 如 http://127.0.0.1:7890 (默认走 api.tmdb.org, 国内能直连) */
     val proxy: String? = null,
 )
 

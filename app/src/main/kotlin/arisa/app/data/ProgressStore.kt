@@ -30,7 +30,7 @@ class ProgressStore(context: Context) {
         prefs.edit().putString("all", json.encodeToString(serializer, _all.value)).apply()
     }
 
-    /** 继续观看: 看了一半的, 以及看完一集后的下一集. 按最近观看排序. */
+    /** 继续观看: 看了一半的, 以及看完一集后的下一集. 按最近观看排序, 只留最近 [CONTINUE_LIMIT] 个. */
     fun continueWatching(library: Library, progress: Map<String, PlaybackProgress>): List<ContinueEntry> {
         val entries = mutableListOf<ContinueEntry>()
         for (item in library.items) {
@@ -54,7 +54,7 @@ class ProgressStore(context: Context) {
                 }
             }
         }
-        return entries.sortedByDescending { it.updatedAt }
+        return entries.sortedByDescending { it.updatedAt }.take(CONTINUE_LIMIT)
     }
 
     data class ContinueEntry(
@@ -64,4 +64,8 @@ class ProgressStore(context: Context) {
         val progress: PlaybackProgress?,
         val updatedAt: Long,
     )
+
+    private companion object {
+        const val CONTINUE_LIMIT = 10
+    }
 }

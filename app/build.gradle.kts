@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "quarkflix.app"
+    namespace = "arisa.app"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "quarkflix.app"
+        applicationId = "arisa.app"
         minSdk = 23
         targetSdk = 35
         versionCode = 1

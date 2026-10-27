@@ -1,10 +1,10 @@
-# Quarkflix
+# Arisa
 
 夸克网盘 + AI 刮削 + 安卓 TV 播放器.
 
 ```
 mac mini (刮削器, 常驻)  ──写──▶  夸克网盘  ◀──读──  安卓 TV (展示 + 播放)
-                          /.quarkflix/library-*.json.gz   (汇总索引)
+                          /.arisa/library-*.json.gz   (汇总索引)
                           视频旁边的 .nfo                  (可选, Kodi/Jellyfin/Infuse 通用)
 ```
 
@@ -23,11 +23,11 @@ TV 和 mac mini 不直接通信, TV 只需要扫码登录夸克.
 
 ```sh
 ./gradlew :scraper:installDist
-cp config.example.yaml ~/.quarkflix/config.yaml   # 填 tmdb.api_key、ai 配置、片库目录
-S=scraper/build/install/quarkflix-scraper/bin/quarkflix-scraper
+cp config.example.yaml ~/.arisa/config.yaml   # 填 tmdb.api_key、ai 配置、片库目录
+S=scraper/build/install/arisa-scraper/bin/arisa-scraper
 $S login                 # 粘贴 pan.quark.cn 的 Cookie
 $S ls /电影              # 确认能列目录
-$S scan --dry-run        # 只识别不写网盘, 看 ~/.quarkflix/report.txt
+$S scan --dry-run        # 只识别不写网盘, 看 ~/.arisa/report.txt
 $S scan                  # 写索引和 NFO
 $S daemon                # 常驻定时扫描
 ```

@@ -12,7 +12,7 @@ dependencyResolutionManagement {
         mavenCentral()
     }
 }
-rootProject.name = "quarkflix"
+rootProject.name = "arisa"
 include(":quark")
 include(":library")
 include(":scraper")

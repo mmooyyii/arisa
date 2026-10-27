@@ -1,5 +1,5 @@
-# 复制到 ~/.quarkflix/config.yaml
-# 登录态 (cookie/token) 不放这里, 用 `quarkflix-scraper login` 存到 ~/.quarkflix/state.json
+# 复制到 ~/.arisa/config.yaml
+# 登录态 (cookie/token) 不放这里, 用 `arisa-scraper login` 存到 ~/.arisa/state.json
 
 defaults:
   output: index+nfo          # index / index+nfo / index+full

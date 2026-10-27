@@ -21,8 +21,8 @@ dependencies {
 }
 
 application {
-    mainClass.set("quarkflix.scraper.MainKt")
-    applicationName = "quarkflix-scraper"
+    mainClass.set("arisa.scraper.MainKt")
+    applicationName = "arisa-scraper"
 }
 
 tasks.test { useJUnitPlatform() }

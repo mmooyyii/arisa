@@ -38,6 +38,8 @@ $S serve                 # 常驻服务, 管理网页 http://localhost:7893
 4. 按映射表生成 `/.arisa/library-*.json.gz` 和 NFO, 生成改名计划.
 5. 待确认和改名在管理网页上处理, 不发通知.
 
+日本动画的片名用 Bangumi (bgm.tv) 的中文名, 按原名和年份自动匹配, 匹配不对时在映射里用 `--bangumi ID` 指定.
+
 识别结论存在映射表 (fid → TMDB 作品), 本地 `~/.arisa/mapping.json`, 网盘 `/.arisa/mapping.json` 备份.
 给剧集目录做过映射后, 往里加新集数不用再识别. 不开服务时也可以在 Claude Code 里用 `arisa-scrape` skill 手动刮削.
 

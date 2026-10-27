@@ -24,6 +24,7 @@ class Service(
     private val tmdbFactory: (Config) -> TmdbApi? = { c ->
         if (c.tmdb.apiKey.isBlank()) null else Tmdb(c.tmdb.apiKey, httpClient(c.tmdb.proxy), File(home, "cache/tmdb"))
     },
+    private val bangumiFactory: (Config) -> BangumiApi? = { Bangumi(httpClient(null), File(home, "cache/bangumi")) },
     private val imagesFactory: (Config) -> Images? = { c -> Images(httpClient(c.tmdb.proxy), File(home, "cache/images")) },
     private val agentFactory: (Config) -> ((List<PendingWork>) -> AgentRunner.Result)? = { c ->
         if (c.agent.enabled) AgentRunner(c.agent, home)::run else null
@@ -164,7 +165,7 @@ class Service(
     private fun scraper(config: Config): Scraper {
         val tmdb = tmdbFactory(config)
         configError = if (tmdb == null) "没有 TMDB API Key, 填到 ${configFile.path} 的 tmdb.api_key" else null
-        return Scraper(config, drive, tmdb, imagesFactory(config)) { log(it) }
+        return Scraper(config, drive, tmdb, imagesFactory(config), bangumiFactory(config)) { log(it) }
     }
 
     private fun pipeline(full: Boolean) {
@@ -197,8 +198,7 @@ class Service(
         val tried = mutableSetOf<String>()
         while (true) {
             val skip = review.keys() + tried
-            val keys = scraper.pending(scan, store.load(), withCandidates = false)
-                .map { it.key }.filter { it !in skip }.take(config.batchSize).toSet()
+            val keys = batchKeys(scraper.pending(scan, store.load(), withCandidates = false).filter { it.key !in skip }, config.batchSize)
             if (keys.isEmpty()) return
             tried += keys
             val batch = scraper.pending(scan, store.load(), withCandidates = true, only = keys)
@@ -221,6 +221,20 @@ class Service(
             if (unhandled.isNotEmpty()) log("${unhandled.size} 部 AI 没处理, 放进待确认")
             if (!result.ok) return
         }
+    }
+
+    /**
+     * 取一批作品, 同一个顶层目录 (同一部作品的不同季、版本) 的放在同一批, AI 才能前后一致地映射.
+     * 一个顶层目录本身超过批量时整个放进一批.
+     */
+    private fun batchKeys(works: List<PendingWork>, size: Int): Set<String> {
+        val groups = works.groupBy { it.dirs.firstOrNull()?.fid ?: it.key }.values
+        val batch = mutableListOf<PendingWork>()
+        for (g in groups) {
+            if (batch.isNotEmpty() && batch.size + g.size > size) break
+            batch += g
+        }
+        return batch.mapTo(mutableSetOf()) { it.key }
     }
 
     private fun addCost(usd: Double) {

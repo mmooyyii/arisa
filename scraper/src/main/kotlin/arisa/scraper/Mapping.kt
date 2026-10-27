@@ -20,6 +20,8 @@ data class MappingEntry(
     val season: Int? = null,
     /** 集数加上这个数. TMDB 把多季合成一季 (如 85 集的第 1 季), 而文件按季内编号时用. */
     val episodeOffset: Int? = null,
+    /** 指定 Bangumi 条目 (动画的中文名用它的), 不指定时按原名自动匹配. */
+    val bangumi: Int? = null,
     val note: String? = null,
     /** 谁做的决定: skill / user / nfo / rules */
     val by: String = "skill",

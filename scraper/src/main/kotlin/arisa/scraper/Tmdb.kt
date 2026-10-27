@@ -186,6 +186,8 @@ class Tmdb(
         val seasons: List<SeasonSummary> = emptyList(),
         @SerialName("release_dates") val releaseDates: ReleaseDates? = null,
         @SerialName("content_ratings") val contentRatings: ContentRatings? = null,
+        @SerialName("original_language") val originalLanguage: String? = null,
+        @SerialName("origin_country") val originCountry: List<String> = emptyList(),
     ) {
         val displayTitle get() = title ?: name ?: ""
         val displayOriginal get() = originalTitle ?: originalName

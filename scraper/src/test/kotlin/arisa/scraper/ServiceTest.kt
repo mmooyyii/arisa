@@ -28,6 +28,7 @@ class ServiceTest {
             driveFactory = { drive },
             tmdbFactory = { FakeTmdb() },
             imagesFactory = { null },
+            bangumiFactory = { null },
             agentFactory = { agent },
         )
 

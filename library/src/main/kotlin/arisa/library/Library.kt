@@ -38,6 +38,8 @@ data class MediaItem(
     val type: MediaType,
     val tmdbId: Int? = null,
     val imdbId: String? = null,
+    /** 动画在 Bangumi 上的条目, 片名取自它. */
+    val bangumiId: Int? = null,
     val title: String,
     val originalTitle: String? = null,
     val year: Int? = null,

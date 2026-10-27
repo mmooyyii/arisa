@@ -125,6 +125,7 @@ class Scraper(
     private val drive: Drive,
     private val tmdb: TmdbApi?,
     private val images: Images?,
+    private val bangumi: BangumiApi? = null,
     private val log: (String) -> Unit = ::println,
 ) {
     // ---------- 扫描 ----------
@@ -340,8 +341,9 @@ class Scraper(
             val eff = config.effective(list.first().first.library)
             val source = list.map { it.second.by }.distinct().joinToString("+")
             try {
-                items += if (kind == "movie") buildMovie(tmdb, id, list.map { it.first }, eff, source)
+                val item = if (kind == "movie") buildMovie(tmdb, id, list.map { it.first }, eff, source)
                 else buildTv(tmdb, id, list, eff, source)
+                items += withBangumi(tmdb, item, list.firstNotNullOfOrNull { it.second.bangumi }, eff)
             } catch (e: TmdbAuthException) {
                 throw e
             } catch (e: Exception) {
@@ -368,6 +370,34 @@ class Scraper(
             }
         }
         return library to BuildReport(items.size, unmatched.size, nfoWritten, indexName, renames)
+    }
+
+    /**
+     * 日本动画的片名用 Bangumi 的中文名 (TMDB 的中文名常是机翻或台译).
+     * [override] 是映射里指定的条目; 没指定时按原名和年份自动匹配, 匹配不上就保留 TMDB 的.
+     */
+    private fun withBangumi(tmdb: TmdbApi, item: MediaItem, override: Int?, eff: Config.Effective): MediaItem {
+        val bangumi = bangumi ?: return item
+        val subject = try {
+            if (override != null) {
+                bangumi.subject(override)
+            } else {
+                val movie = item.type == MediaType.MOVIE
+                val d = details(tmdb, if (movie) "movie" else "tv", item.tmdbId ?: return item, eff)
+                val anime = d.genres.any { it.id == ANIMATION } && (d.originalLanguage == "ja" || "JP" in d.originCountry)
+                if (!anime) return item
+                Bangumi.match(bangumi, d.displayOriginal ?: return item, d.year, movie)
+            }
+        } catch (e: Exception) {
+            log("Bangumi 查询失败 ${item.title}: ${e.message}")
+            null
+        } ?: return item
+        val title = subject.displayName
+        return item.copy(
+            title = title,
+            originalTitle = (item.originalTitle ?: subject.name).takeIf { it != title },
+            bangumiId = subject.id,
+        )
     }
 
     private fun details(tmdb: TmdbApi, kind: String, id: Int, eff: Config.Effective): Tmdb.Details {
@@ -656,6 +686,9 @@ class Scraper(
     }
 
     private companion object {
+        /** TMDB 的「动画」类型. */
+        const val ANIMATION = 16
+
         /** TMDB 剧集类型有几个没有中文翻译. */
         val GENRE_ZH = mapOf(
             "Sci-Fi & Fantasy" to "科幻奇幻",

@@ -40,7 +40,8 @@ private const val USAGE = """arisa-scraper <命令> [参数]
   auto                          自动识别确定的 (已有 NFO / TMDB 唯一且名字年份完全对上)
   tmdb search <片名> [--tv|--movie] [--year 年份]
   tmdb show <movie|tv> <id>     详情, 剧集含每季集数
-  decide <fid> <movie:ID|tv:ID|skip> [--season N] [--episode-offset N] [--note 说明]
+  bangumi search <名字>          搜 Bangumi 的动画条目 (日本动画的中文名用它的)
+  decide <fid> <movie:ID|tv:ID|skip> [--season N] [--episode-offset N] [--bangumi ID] [--note 说明]
   undecide <fid>
   ask <key> --reason 原因 [--guess movie:ID|tv:ID]   拿不准, 交给用户在网页上确认
   mapping                       查看映射表
@@ -160,16 +161,22 @@ fun main(argv: Array<String>) {
                 println("自动识别 $added 部")
             }
             "tmdb" -> tmdbCommand(args, Config.load(configFile))
+            "bangumi" -> {
+                require(args.removeFirstOrNull() == "search") { "用法: bangumi search <名字>" }
+                val api = Bangumi(httpClient(null), File(home, "cache/bangumi"))
+                println(json.encodeToString(JsonArray.serializer(), bangumiSearchJson(api, args.joinToString(" "))))
+            }
             "decide" -> {
                 val fid = args.removeFirst()
                 val target = args.removeFirst()
                 require(MappingEntry.validTarget(target)) { "target 要写成 movie:ID / tv:ID / skip" }
                 val season = takeOption(args, "--season")?.toInt()
                 val offset = takeOption(args, "--episode-offset")?.toInt()
+                val bgm = takeOption(args, "--bangumi")?.toInt()
                 val note = takeOption(args, "--note")
                 val ctx = context(configFile, state, needTmdb = false, quiet = true)
                 val path = pathFromPending(fid) ?: fid
-                ctx.store.update { it.with(fid, MappingEntry(target, path, season, offset, note, by = "skill")) }
+                ctx.store.update { it.with(fid, MappingEntry(target, path, season, offset, bgm, note, by = "skill")) }
                 println("$path → $target${season?.let { " 第 $it 季" } ?: ""}${offset?.let { " 集数 +$it" } ?: ""}")
             }
             "undecide" -> {
@@ -282,7 +289,7 @@ private fun context(configFile: File, state: StateStore, needTmdb: Boolean, quie
     val images = Images(tmdbHttp, File(home, "cache/images"))
     // JSON 输出的命令把日志打到 stderr, 不污染 stdout
     val log: (String) -> Unit = if (quiet) { msg -> System.err.println(msg) } else ::println
-    return Context(Scraper(config, drive, tmdb, images, log), MappingStore(File(home, "mapping.json"), drive), drive)
+    return Context(Scraper(config, drive, tmdb, images, Bangumi(httpClient(null), File(home, "cache/bangumi")), log), MappingStore(File(home, "mapping.json"), drive), drive)
 }
 
 private fun build(ctx: Context, write: Boolean) {

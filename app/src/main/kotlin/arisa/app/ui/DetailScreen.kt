@@ -55,6 +55,7 @@ import androidx.tv.material3.Text
 import coil3.compose.AsyncImage
 import arisa.app.ArisaApp
 import arisa.library.Episode
+import arisa.library.MediaFile
 import arisa.library.MediaItem
 import arisa.library.MediaType
 import arisa.library.PlaybackProgress
@@ -139,9 +140,10 @@ fun DetailScreen(
                             }
                             // 电影有多个版本时可以选
                             if (item.type == MediaType.MOVIE && item.files.size > 1) {
+                                val labels = versionLabels(item.files)
                                 item.files.drop(1).forEachIndexed { i, f ->
                                     Button(onClick = { onPlay(f.fid, false) }, colors = secondaryButton()) {
-                                        Text("版本 ${i + 2} " + qualityTags(listOf(f)).joinToString(" "))
+                                        Text(labels[i + 1])
                                     }
                                 }
                             }
@@ -267,3 +269,12 @@ fun formatClock(ms: Long): String {
     val s = ms / 1000
     return if (s >= 3600) "%d:%02d:%02d".format(s / 3600, s % 3600 / 60, s % 60) else "%d:%02d".format(s / 60, s % 60)
 }
+
+/** 版本按钮上的字: 画质标签, 标签相同的版本再带上文件大小区分. */
+private fun versionLabels(files: List<MediaFile>): List<String> {
+    val tags = files.map { qualityTags(listOf(it)).joinToString(" ").ifEmpty { "其他版本" } }
+    return files.mapIndexed { i, f ->
+        if (tags.count { it == tags[i] } > 1) "${tags[i]} · %.1f GB".format(f.size / 1e9) else tags[i]
+    }
+}
+

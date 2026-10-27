@@ -1,0 +1,2147 @@
+{
+ "generatedAt": 1793068557505,
+ "items": [
+  {
+   "id": "movie:693134",
+   "type": "movie",
+   "tmdbId": 693134,
+   "title": "沙丘2",
+   "year": 2024,
+   "overview": "改编自弗兰克·赫伯特的科幻小说《沙丘》。保罗·厄崔迪与契妮及弗雷曼人结盟，踏上向摧毁其家族的阴谋者复仇之路。面对挚爱与已知宇宙命运之间的抉择，他必须努力阻止自己预见的可怕未来。",
+   "genres": [
+    "科幻",
+    "冒险"
+   ],
+   "rating": 8.1,
+   "runtime": 166,
+   "certification": "PG13",
+   "poster": "/3t2IQjn5f3RwyRmeo1VGzIHEknl.jpg",
+   "backdrop": "/eZ239CUp1d6OryZEBPnO2n87gMG.jpg",
+   "logo": "/a3A0e2GsGOaw1uLhaRFUid0BVyp.png",
+   "art": {
+    "color": "#27241c",
+    "posterBlurHash": "L%Nk,vWDxYs.~Sj[R+bGOXj@Rkaz",
+    "backdropBlurHash": "LYG[p0Nb^+M{~p-;fRoftR%MWBt7"
+   },
+   "cast": [
+    {
+     "name": "提莫西·查拉梅",
+     "character": "Paul Atreides",
+     "profile": "/dFxpwRpmzpVfP1zjluH68DeQhyj.jpg"
+    },
+    {
+     "name": "赞达亚·科尔曼",
+     "character": "Chani",
+     "profile": "/qGkBlyn1AwQpuFnRARMRwj0iHZp.jpg"
+    },
+    {
+     "name": "丽贝卡·弗格森",
+     "character": "Jessica",
+     "profile": "/ra53cM1aNmdH0aFhj8yBqPOj2fb.jpg"
+    },
+    {
+     "name": "哈维尔·巴登",
+     "character": "Stilgar",
+     "profile": "/zfRID0jx8DKBluPGU9xtk9sZWUt.jpg"
+    },
+    {
+     "name": "乔什·布洛林",
+     "character": "Gurney Halleck",
+     "profile": "/7QpneI3HoZCCDVPyWx3p3t7yeo7.jpg"
+    },
+    {
+     "name": "奥斯汀·巴特勒",
+     "character": "Feyd-Rautha",
+     "profile": "/atdAs4pFGjUQ4m2W8kJYly7N6cC.jpg"
+    },
+    {
+     "name": "弗洛伦丝·皮尤",
+     "character": "Princess Irulan",
+     "profile": "/1QfiLnofJFlOJOLCWaxyDpIN03v.jpg"
+    },
+    {
+     "name": "戴夫·巴蒂斯塔",
+     "character": "Beast Rabban",
+     "profile": "/snk6JiXOOoRjPtHU5VMoy6qbd32.jpg"
+    },
+    {
+     "name": "克里斯托弗·沃肯",
+     "character": "Emperor",
+     "profile": "/ApgDL7nudR9T2GpjCG4vESgymO2.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-693134",
+     "name": "沙丘2.2160p.HDR.mkv",
+     "path": "/电影/沙丘2",
+     "size": 0
+    }
+   ],
+   "addedAt": 1793068557505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:438631",
+   "type": "movie",
+   "tmdbId": 438631,
+   "title": "沙丘",
+   "year": 2021,
+   "overview": "改编自弗兰克·赫伯特的科幻小说《沙丘》。保罗·厄崔迪随家族前往沙漠星球厄拉科斯，卷入围绕珍贵资源“香料”的权力争斗，并逐渐发现自己肩负的命运。",
+   "genres": [
+    "科幻",
+    "冒险"
+   ],
+   "rating": 7.8,
+   "runtime": 156,
+   "certification": "PG13",
+   "poster": "/pJ39749QfmtCJELCct9JzMTtrjE.jpg",
+   "backdrop": "/jYEW5xZkZk2WTrdbMGAPFuBqbDc.jpg",
+   "logo": "/6C3HR9TNssagEt0Po7rfp9AzBKw.png",
+   "art": {
+    "color": "#547673",
+    "posterBlurHash": "L}LM2$IqV@f6~9WDWBjss8xZjboJ",
+    "backdropBlurHash": "LNDwa2kByEozy?kCkWj[DiayMxay"
+   },
+   "cast": [
+    {
+     "name": "提莫西·查拉梅",
+     "character": "Paul Atreides",
+     "profile": "/dFxpwRpmzpVfP1zjluH68DeQhyj.jpg"
+    },
+    {
+     "name": "丽贝卡·弗格森",
+     "character": "Lady Jessica Atreides",
+     "profile": "/ra53cM1aNmdH0aFhj8yBqPOj2fb.jpg"
+    },
+    {
+     "name": "奥斯卡·伊萨克",
+     "character": "Duke Leto Atreides",
+     "profile": "/dW5U5yrIIPmMjRThR9KT2xH6nTz.jpg"
+    },
+    {
+     "name": "杰森·莫玛",
+     "character": "Duncan Idaho",
+     "profile": "/3troAR6QbSb6nUFMDu61YCCWLKa.jpg"
+    },
+    {
+     "name": "斯特兰·斯卡斯加德",
+     "character": "Baron Vladimir Harkonnen",
+     "profile": "/mW7xmtGV4y79kQGn0zkKVGDMAmw.jpg"
+    },
+    {
+     "name": "斯蒂芬·亨德森",
+     "character": "Thufir Hawat",
+     "profile": "/z2weSPo4sdMNj47tP5o0me41r2z.jpg"
+    },
+    {
+     "name": "乔什·布洛林",
+     "character": "Gurney Halleck",
+     "profile": "/7QpneI3HoZCCDVPyWx3p3t7yeo7.jpg"
+    },
+    {
+     "name": "哈维尔·巴登",
+     "character": "Stilgar",
+     "profile": "/zfRID0jx8DKBluPGU9xtk9sZWUt.jpg"
+    },
+    {
+     "name": "莎朗·邓肯-布鲁斯特",
+     "character": "Dr. Liet Kynes",
+     "profile": "/gp5h6rOrqBrIGgID4AMd58O6Ow6.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-438631",
+     "name": "沙丘.2160p.HDR.mkv",
+     "path": "/电影/沙丘",
+     "size": 0
+    }
+   ],
+   "addedAt": 1792809357505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:157336",
+   "type": "movie",
+   "tmdbId": 157336,
+   "title": "星际穿越",
+   "year": 2014,
+   "overview": "太空探险队队员克服重重困难，成功通过新近发现的虫洞，突破人类太空旅行的极限，进入另一个时空。",
+   "genres": [
+    "冒险",
+    "剧情",
+    "科幻"
+   ],
+   "rating": 8.5,
+   "runtime": 169,
+   "certification": "PG13",
+   "poster": "/spQm5r317XPNHK1941ChWmqzkZs.jpg",
+   "backdrop": "/8sNiAPPYU14PUepFNeSNGUTiHW.jpg",
+   "logo": "/zHoDJoAnUIEaHER3xqKxDWLaJAK.png",
+   "art": {
+    "color": "#1b111e",
+    "posterBlurHash": "LWD[noMxELJ+I:NGs.kC0xxvwJxH",
+    "backdropBlurHash": "LRGaqn4mAC9@%2IT%3Sg5Pxu$Qs:"
+   },
+   "cast": [
+    {
+     "name": "马修·麦康纳",
+     "character": "Cooper",
+     "profile": "/lCySuYjhXix3FzQdS4oceDDrXKI.jpg"
+    },
+    {
+     "name": "安妮·海瑟薇",
+     "character": "Brand",
+     "profile": "/s6tflSD20MGz04ZR2R1lZvhmC4Y.jpg"
+    },
+    {
+     "name": "迈克尔·凯恩",
+     "character": "Professor Brand",
+     "profile": "/bVZRMlpjTAO2pJK6v90buFgVbSW.jpg"
+    },
+    {
+     "name": "杰西卡·查斯坦",
+     "character": "Murph",
+     "profile": "/mR1ELpP0T2Q1ZRSaADPgtrbPGla.jpg"
+    },
+    {
+     "name": "卡西·阿弗莱克",
+     "character": "Tom",
+     "profile": "/304ilSygaCRWykoBWAL67TOw8g9.jpg"
+    },
+    {
+     "name": "韦斯·本特利",
+     "character": "Doyle",
+     "profile": "/voD93lzFZrr9xfAggwFcPRBi84i.jpg"
+    },
+    {
+     "name": "托弗·戈瑞斯",
+     "character": "Getty",
+     "profile": "/89sF57Br5lq8nrepS7HLzJ41QD1.jpg"
+    },
+    {
+     "name": "麦肯基·弗依",
+     "character": "Murph (10 Yrs.)",
+     "profile": "/ga2HkX7gBjjXooegTu9cLgXy9nE.jpg"
+    },
+    {
+     "name": "艾伦·伯斯汀",
+     "character": "Murph (older)",
+     "profile": "/zGihSIVRzwmCqilnA4PmNM4C2RT.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-157336",
+     "name": "星际穿越.2160p.HDR.mkv",
+     "path": "/电影/星际穿越",
+     "size": 0
+    }
+   ],
+   "addedAt": 1792550157505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:27205",
+   "type": "movie",
+   "tmdbId": 27205,
+   "title": "盗梦空间",
+   "year": 2010,
+   "overview": "道姆·柯布与同事阿瑟和纳什在一次针对日本能源大亨齐藤（渡边谦 饰）的盗梦行动中失败，反被齐藤利用。齐藤威逼利诱因遭通缉而流亡海外的柯布帮他拆分他竞争对手的公司，采取极端措施在其唯一继承人罗伯特·费希尔的深层潜意识中种下放弃家族公司、自立门户的想法。为了重返美国，柯布偷偷求助于岳父迈尔斯，吸收了年轻的梦境设计师艾里阿德妮、梦境演员艾姆斯和药剂师约瑟夫加入行动。在一层层递进的梦境中，柯布不仅要对付费希尔潜意识的本能反抗，还必须直面已逝妻子梅尔的处处破坏，实际情况远比预想危险得多……",
+   "genres": [
+    "动作",
+    "科幻",
+    "犯罪"
+   ],
+   "rating": 8.4,
+   "runtime": 148,
+   "certification": "PG",
+   "poster": "/89W962aAnPS3N3BdKgy2BvUhnCh.jpg",
+   "backdrop": "/8ZTVqvKDQ8emSGUEMjsS4yHAwrp.jpg",
+   "logo": "/r9CBkiQlCDsis2wepfttk4DqxoJ.png",
+   "art": {
+    "color": "#283233",
+    "posterBlurHash": "LI8=HCS%I9Ri*0W?soaeH=oeyEoz",
+    "backdropBlurHash": "LEBq3l9J?ZIV^~00?bIUnN8{%LM|"
+   },
+   "cast": [
+    {
+     "name": "莱昂纳多·迪卡普里奥",
+     "character": "Dom Cobb",
+     "profile": "/wo2hJpn04vbtmh0B9utCFdsQhxM.jpg"
+    },
+    {
+     "name": "约瑟夫·高登-莱维特",
+     "character": "Arthur",
+     "profile": "/z2FA8js799xqtfiFjBTicFYdfk.jpg"
+    },
+    {
+     "name": "渡边谦",
+     "character": "Saito",
+     "profile": "/psAXOYp9SBOXvg6AXzARDedNQ9P.jpg"
+    },
+    {
+     "name": "汤姆·哈迪",
+     "character": "Eames",
+     "profile": "/d81K0RH8UX7tZj49tZaQhZ9ewH.jpg"
+    },
+    {
+     "name": "艾利奥特·佩吉",
+     "character": "Ariadne",
+     "profile": "/nXO8DE4biVXY4UDYP0NdIY1zvXS.jpg"
+    },
+    {
+     "name": "迪利普·劳",
+     "character": "Yusuf",
+     "profile": "/jRNn8SZqFXuI5wOOlHwYsWh0hXs.jpg"
+    },
+    {
+     "name": "基利安·墨菲",
+     "character": "Robert Fischer, Jr.",
+     "profile": "/2lKs67r7FI4bPu0AXxMUJZxmUXn.jpg"
+    },
+    {
+     "name": "汤姆·贝伦杰",
+     "character": "Peter Browning",
+     "profile": "/zLxzAdAfu7y02yEx29JSLDgXJZ4.jpg"
+    },
+    {
+     "name": "玛丽昂·歌迪亚",
+     "character": "Mal Cobb",
+     "profile": "/biitzOF0GffIqFYLyOPkoiaOngQ.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-27205",
+     "name": "盗梦空间.2160p.HDR.mkv",
+     "path": "/电影/盗梦空间",
+     "size": 0
+    }
+   ],
+   "addedAt": 1792290957505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:155",
+   "type": "movie",
+   "tmdbId": 155,
+   "title": "蝙蝠侠：黑暗骑士",
+   "year": 2008,
+   "overview": "蝙蝠侠在吉姆·戈登警官和检察官哈维·登特的协助下，致力于彻底铲除哥谭市的犯罪组织。然而，三人的合作很快遭到犯罪天才小丑的破坏。小丑将哥谭市拖入混乱，迫使蝙蝠侠游走于英雄与私刑者的界限之间。",
+   "genres": [
+    "动作",
+    "惊悚",
+    "犯罪"
+   ],
+   "rating": 8.5,
+   "runtime": 152,
+   "certification": "PG",
+   "poster": "/qYB7QqwT1NtTW9aCwtopGy80rmA.jpg",
+   "backdrop": "/9FE5eD92WfVCiivM9Pq9GVSrlWk.jpg",
+   "logo": "/55Sgp2TMTiTXRVrRsySAT6wq1Ak.png",
+   "art": {
+    "color": "#1d4754",
+    "posterBlurHash": "LF97^l.9E+XT_N%gS~kWyDtRrqn~",
+    "backdropBlurHash": "LB9aKyAb9Z;1_3Y6R5Q-3E;e#Q5m"
+   },
+   "cast": [
+    {
+     "name": "克里斯蒂安·贝尔",
+     "character": "Bruce Wayne",
+     "profile": "/7Pxez9J8fuPd2Mn9kex13YALrCQ.jpg"
+    },
+    {
+     "name": "希斯·莱杰",
+     "character": "Joker",
+     "profile": "/p2z2bURSg7nuMsN9P2s61e2RvNz.jpg"
+    },
+    {
+     "name": "艾伦·艾克哈特",
+     "character": "Harvey Dent",
+     "profile": "/u5JjnRMr9zKEVvOP7k3F6gdcwT6.jpg"
+    },
+    {
+     "name": "迈克尔·凯恩",
+     "character": "Alfred",
+     "profile": "/bVZRMlpjTAO2pJK6v90buFgVbSW.jpg"
+    },
+    {
+     "name": "玛吉·吉伦哈尔",
+     "character": "Rachel",
+     "profile": "/vsfkWdYWmA9CpzMHTJzrFxlDnEZ.jpg"
+    },
+    {
+     "name": "加里·奥德曼",
+     "character": "Gordon",
+     "profile": "/yhaSM5habNNI1Tf4ALRwRk3VvSZ.jpg"
+    },
+    {
+     "name": "摩根·弗里曼",
+     "character": "Lucius Fox",
+     "profile": "/905k0RFzH0Kd6gx8oSxRdnr6FL.jpg"
+    },
+    {
+     "name": "莫妮克·加布里埃拉·库尔内",
+     "character": "Ramirez",
+     "profile": "/lJgLQs7cfM49m8VzVviwxIByz76.jpg"
+    },
+    {
+     "name": "罗恩·迪恩",
+     "character": "Wuertz",
+     "profile": "/mgqdr4VFrTVZatkki2suNLYxeDG.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-155",
+     "name": "蝙蝠侠：黑暗骑士.2160p.HDR.mkv",
+     "path": "/电影/蝙蝠侠：黑暗骑士",
+     "size": 0
+    }
+   ],
+   "addedAt": 1792031757505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:872585",
+   "type": "movie",
+   "tmdbId": 872585,
+   "title": "奥本海默",
+   "year": 2023,
+   "overview": "改编自凯·伯德和马丁·J·舍温合著的传记作品《美国普罗米修斯：J·罗伯特·奥本海默的胜利与悲剧》。理论物理学家J·罗伯特·奥本海默领导曼哈顿计划，研制出世界上第一颗原子弹，彻底改变了历史进程。",
+   "genres": [
+    "剧情",
+    "历史",
+    "战争"
+   ],
+   "rating": 8.0,
+   "runtime": 181,
+   "certification": "M18",
+   "poster": "/rsIPinYsOSzTMQgy1cRZwzuMUzs.jpg",
+   "backdrop": "/neeNHeXjMF5fXoCJRsOmkNGC7q.jpg",
+   "logo": "/qjtZJw6f5olKXAg1Q2JXpAdKS08.png",
+   "art": {
+    "color": "#8c491b",
+    "posterBlurHash": "LZFDYUxFNInP};oeNIRkxYsoR+af",
+    "backdropBlurHash": "LcM#qGt6n+%e~9tQt6ofMyxsS#V@"
+   },
+   "cast": [
+    {
+     "name": "基利安·墨菲",
+     "character": "J. Robert Oppenheimer",
+     "profile": "/2lKs67r7FI4bPu0AXxMUJZxmUXn.jpg"
+    },
+    {
+     "name": "艾米莉·布朗特",
+     "character": "Kitty Oppenheimer",
+     "profile": "/5nCSG5TL1bP1geD8aaBfaLnLLCD.jpg"
+    },
+    {
+     "name": "马特·达蒙",
+     "character": "Leslie Groves",
+     "profile": "/aCvBXTAR9B1qRjIRzMBYhhbm1fR.jpg"
+    },
+    {
+     "name": "小罗伯特·唐尼",
+     "character": "Lewis Strauss",
+     "profile": "/5qHNjhtjMD4YWH3UP0rm4tKwxCL.jpg"
+    },
+    {
+     "name": "弗洛伦丝·皮尤",
+     "character": "Jean Tatlock",
+     "profile": "/1QfiLnofJFlOJOLCWaxyDpIN03v.jpg"
+    },
+    {
+     "name": "乔什·哈奈特",
+     "character": "Ernest Lawrence",
+     "profile": "/5eMo8D7h1XrSu6ZN4UXhPcS6YNG.jpg"
+    },
+    {
+     "name": "卡西·阿弗莱克",
+     "character": "Boris Pash",
+     "profile": "/304ilSygaCRWykoBWAL67TOw8g9.jpg"
+    },
+    {
+     "name": "拉米·马雷克",
+     "character": "David Hill",
+     "profile": "/8ykTeTRSYd2MKF5uLBvD93X5KMJ.jpg"
+    },
+    {
+     "name": "肯尼思·布拉纳",
+     "character": "Niels Bohr",
+     "profile": "/AbCqqFxNi5w3nDUFdQt0DGMFh5H.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-872585",
+     "name": "奥本海默.2160p.HDR.mkv",
+     "path": "/电影/奥本海默",
+     "size": 0
+    }
+   ],
+   "addedAt": 1791772557505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:603",
+   "type": "movie",
+   "tmdbId": 603,
+   "title": "黑客帝国",
+   "year": 1999,
+   "overview": "不久的将来，网络黑客尼奥对这个看似正常的现实世界产生了怀疑。他结识了黑客崔妮蒂，并见到了黑客组织的首领墨菲斯。墨菲斯告诉他，现实世界其实是由一个名叫“母体”的计算机人工智能系统控制，人们就像他们饲养的动物，没有自由和思想，而尼奥就是能够拯救人类的救世主。可是，救赎之路从来都不会一帆风顺，到底哪里才是真实的世界？如何才能打败那些超人一样的特勤？尼奥是不是人类的希望？这是黑客的帝国，程序和代码欢迎大家的到来。",
+   "genres": [
+    "动作",
+    "科幻"
+   ],
+   "rating": 8.3,
+   "runtime": 136,
+   "certification": "PG",
+   "poster": "/eMurN09rDC2qeEv3npkUbcJfIXN.jpg",
+   "backdrop": "/tlm8UkiQsitc8rSuIAscQDCnP8d.jpg",
+   "logo": "/tmogqY2O6rzYGE6zIgreV8odId5.png",
+   "art": {
+    "color": "#0f1c26",
+    "posterBlurHash": "LR8PD1bGbtkV*GfkbFofyBofRQof",
+    "backdropBlurHash": "LxOp[F-:~qIU?bM|IUxut7j[M{oe"
+   },
+   "cast": [
+    {
+     "name": "基努·里维斯",
+     "character": "Neo",
+     "profile": "/8RZLOyYGsoRe9p44q3xin9QkMHv.jpg"
+    },
+    {
+     "name": "劳伦斯·菲什伯恩",
+     "character": "Morpheus",
+     "profile": "/2GbXERENPpl5MmlqOLlPVaVtifD.jpg"
+    },
+    {
+     "name": "凯瑞-安·莫斯",
+     "character": "Trinity",
+     "profile": "/9zya72vRZYBQILfetACsnmCBgdj.jpg"
+    },
+    {
+     "name": "雨果·维文",
+     "character": "Agent Smith",
+     "profile": "/lSC8Et0PYi5zeQb3IpPkFje7hgR.jpg"
+    },
+    {
+     "name": "格洛丽亚·福斯特",
+     "character": "Oracle",
+     "profile": "/AriGXtC9fjBOia9Zr8CZjn4o3rx.jpg"
+    },
+    {
+     "name": "乔·潘托里亚诺",
+     "character": "Cypher",
+     "profile": "/3OHUI3nX4SYGGItDk3xqeIvWtIf.jpg"
+    },
+    {
+     "name": "马库斯·钟",
+     "character": "Tank",
+     "profile": "/q9HQttibTj2MoXVtLjq2kKqmPrE.jpg"
+    },
+    {
+     "name": "朱利安·阿拉汗加",
+     "character": "Apoc",
+     "profile": "/g2YkF3PWSJU1vTKuURBH0DOMblm.jpg"
+    },
+    {
+     "name": "马特·多兰",
+     "character": "Mouse",
+     "profile": "/4HtMShAbsZ2AyFtq5z3bOVrvw2s.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-603",
+     "name": "黑客帝国.2160p.HDR.mkv",
+     "path": "/电影/黑客帝国",
+     "size": 0
+    }
+   ],
+   "addedAt": 1791513357505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:335984",
+   "type": "movie",
+   "tmdbId": 335984,
+   "title": "银翼杀手2049",
+   "year": 2017,
+   "overview": "在《银翼杀手》（1982）事件发生三十年后，新一代银翼杀手、洛杉矶警察“K”发现了一个尘封已久的秘密，这个秘密有可能使所剩无几的社会陷入混乱。K的这一发现引领他踏上寻找失踪三十年的前洛杉矶警察银翼杀手瑞克·戴克之路。[华纳兄弟影业]",
+   "genres": [
+    "科幻",
+    "剧情"
+   ],
+   "rating": 7.6,
+   "runtime": 164,
+   "certification": "R",
+   "poster": "/sxA89XGotN9c5u5O1GWpbYYX3Ks.jpg",
+   "backdrop": "/gNdLJU9TxrpGx4dkZidjys3fyy0.jpg",
+   "logo": "/dtkRW6EWXTuoLXjAI8HMDnIEWtm.png",
+   "art": {
+    "color": "#1c0e33",
+    "posterBlurHash": "LTDkoj{KiyXm?H+awJS~r[WXJ7Nb",
+    "backdropBlurHash": "LKCX2*}19;AA1tAVoI$gNWsQ$jbI"
+   },
+   "cast": [
+    {
+     "name": "瑞恩·高斯林",
+     "character": "'K'",
+     "profile": "/lyUyVARQKhGxaxy0FbPJCQRpiaW.jpg"
+    },
+    {
+     "name": "哈里森·福特",
+     "character": "Rick Deckard",
+     "profile": "/pjBMJVPpcZK23Vt1nzr1zEBTWrP.jpg"
+    },
+    {
+     "name": "安娜·德·阿玛斯",
+     "character": "Joi",
+     "profile": "/ngHnBOofQzCO3AvMyuW3UMRWg1B.jpg"
+    },
+    {
+     "name": "戴夫·巴蒂斯塔",
+     "character": "Sapper Morton",
+     "profile": "/snk6JiXOOoRjPtHU5VMoy6qbd32.jpg"
+    },
+    {
+     "name": "罗宾·怀特",
+     "character": "Lieutenant Joshi",
+     "profile": "/d3rIv0y2p0jMsQ7ViR7O1606NZa.jpg"
+    },
+    {
+     "name": "西尔维娅·侯克斯",
+     "character": "Luv",
+     "profile": "/wKC9LgqgJRCXuzs1kUKaK7Uicv.jpg"
+    },
+    {
+     "name": "麦肯兹·戴维斯",
+     "character": "Mariette",
+     "profile": "/ekQbEIKh26jbz17P0wwLbo6uNs9.jpg"
+    },
+    {
+     "name": "杰瑞德·莱托",
+     "character": "Niander Wallace",
+     "profile": "/ca3x0OfIKbJppZh8S1Alx3GfUZO.jpg"
+    },
+    {
+     "name": "卡拉·朱里",
+     "character": "Dr. Ana Stelline",
+     "profile": "/7Tu9PCmTyLD1wWP8PGCzZpuImre.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-335984",
+     "name": "银翼杀手2049.2160p.HDR.mkv",
+     "path": "/电影/银翼杀手2049",
+     "size": 0
+    }
+   ],
+   "addedAt": 1791254157505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:129",
+   "type": "movie",
+   "tmdbId": 129,
+   "title": "千与千寻",
+   "year": 2001,
+   "overview": "10岁的千寻跟随父母搬家途中，意外穿过一条神秘隧道，闯入了一个属于神灵的奇异世界。父母因为擅自吃下供奉给神灵的食物而被变成猪，惊慌失措的千寻则在神秘少年白龙的帮助下得以留下。为了在这个世界生存并寻找救回父母的方法，她不得不到汤婆婆掌管的“油屋”浴场工作。在形形色色的神灵与不可思议的遭遇中，原本胆小任性的千寻开始学会独自面对困难，而她也必须找到离开这里、带父母重返人类世界的方法……",
+   "genres": [
+    "动画",
+    "家庭",
+    "奇幻"
+   ],
+   "rating": 8.5,
+   "runtime": 125,
+   "certification": "G",
+   "poster": "/dnwMqbndJpOEhoVqjlMU9U7LFle.jpg",
+   "backdrop": "/m4TUa2ciEWSlk37rOsjiSIvZDXE.jpg",
+   "logo": "/bIM7zi90Z8NYxvZkYU6lkmWJGKh.png",
+   "art": {
+    "color": "#251c1e",
+    "posterBlurHash": "LTC}^Jxa0yM|ADWBw{t7I;WVxZoL",
+    "backdropBlurHash": "Lb9[AJt6RjR**0oejZj[kqaxofj@"
+   },
+   "cast": [
+    {
+     "name": "柊瑠美",
+     "character": "Chihiro (voice)",
+     "profile": "/nTKM4GgfkrZvAOFL55uhEuckt7M.jpg"
+    },
+    {
+     "name": "入野自由",
+     "character": "Haku (voice)",
+     "profile": "/8qEEhHUObNvGQr4e6eqLu5z4qTz.jpg"
+    },
+    {
+     "name": "夏木真理",
+     "character": "Yubaba / Zeniba (voice)",
+     "profile": "/MIFzUc77Sx57FQOZsoiGWEbpH2.jpg"
+    },
+    {
+     "name": "内藤刚志",
+     "character": "Father (voice)",
+     "profile": "/xwsm0ygjG79jLIogutwo6r64igy.jpg"
+    },
+    {
+     "name": "泽口靖子",
+     "character": "Mother (voice)",
+     "profile": "/rWspusb13VeJowmctnniXYYTcqq.jpg"
+    },
+    {
+     "name": "我修院达也",
+     "character": "Aogaeru (voice)",
+     "profile": "/fLqIdkShknsJmZy4EfBWuWyHN4C.jpg"
+    },
+    {
+     "name": "神木隆之介",
+     "character": "Boh (voice)",
+     "profile": "/ut7ewXjdgUmgkhJ1EtbOo9tbc7s.jpg"
+    },
+    {
+     "name": "玉井夕海",
+     "character": "Rin (voice)",
+     "profile": "/x9Td7e5F21cK9S1FCkobfqiJZ1c.jpg"
+    },
+    {
+     "name": "大泉洋",
+     "character": "Bandai Frog (voice)",
+     "profile": "/qw5KLuww2AEAk6JEssEkJY3wBn1.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-129",
+     "name": "千与千寻.2160p.HDR.mkv",
+     "path": "/电影/千与千寻",
+     "size": 0
+    }
+   ],
+   "addedAt": 1790994957505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:496243",
+   "type": "movie",
+   "tmdbId": 496243,
+   "title": "寄生虫",
+   "year": 2019,
+   "overview": "金基泽一家四口挤在首尔一间狭小的半地下室里，没有稳定工作，只能靠零散的活计勉强维持生活。一天，儿子基宇经朋友介绍，得到前往富裕的朴社长家担任英语家教的机会。进入这个与自己生活截然不同的家庭后，基宇发现了新的机会，并设法将妹妹基婷包装成艺术老师介绍给朴家。随后，一家人通过精心设计，让父亲和母亲也先后进入朴家工作，而朴家始终不知道这四名新雇员其实来自同一个家庭。就在金家逐渐适应这份来之不易的优渥生活时，一个隐藏在朴家豪宅中的秘密突然出现，两个家庭之间看似稳定的关系也开始走向无法预料的方向……",
+   "genres": [
+    "喜剧",
+    "惊悚",
+    "剧情"
+   ],
+   "rating": 8.5,
+   "runtime": 132,
+   "certification": "M18",
+   "poster": "/nwTQE4vWe6NoFSEgxGu4hO9J4Tv.jpg",
+   "backdrop": "/TU9NIjwzjoKPwQHoHshkFcQUCG.jpg",
+   "logo": "/xPkibMmZNw0fbkM1fqRuHwIFu2W.png",
+   "art": {
+    "color": "#1d1d1b",
+    "posterBlurHash": "LHBEgRxukWRQ4XIUtQaxX+W;s:t6",
+    "backdropBlurHash": "L89@O=nN01pIo}kCxDngtMaeV?x["
+   },
+   "cast": [
+    {
+     "name": "宋康昊",
+     "character": "Kim Ki-taek",
+     "profile": "/kBM9UTPYXUA2RNk210DXhztLFns.jpg"
+    },
+    {
+     "name": "李善均",
+     "character": "Park Dong-ik",
+     "profile": "/nHFBbSFohzOUOvMxPVwe3Es2nJw.jpg"
+    },
+    {
+     "name": "曹汝贞",
+     "character": "Yeon-kyo",
+     "profile": "/5MgWM8pkUiYkj9MEaEpO0Ir1FD9.jpg"
+    },
+    {
+     "name": "崔宇植",
+     "character": "Ki-woo",
+     "profile": "/9mZ9DNopxpCLUjXd0rLd42TLamw.jpg"
+    },
+    {
+     "name": "朴素丹",
+     "character": "Ki-jung",
+     "profile": "/fGVOikpvivopeATDy6ZzLdKYXDu.jpg"
+    },
+    {
+     "name": "李姃垠",
+     "character": "Moon-gwang",
+     "profile": "/4r3K47UpSmzZ5t9cyTRRqRl9rdz.jpg"
+    },
+    {
+     "name": "张慧珍",
+     "character": "Chung-sook",
+     "profile": "/pZiQXSWwo9F4gncHfa1yw0CQjxk.jpg"
+    },
+    {
+     "name": "朴明勋",
+     "character": "Geun-se",
+     "profile": "/5SucrxkigHss7UuJKrkfAZX5MXz.jpg"
+    },
+    {
+     "name": "郑知晓",
+     "character": "Da-hye",
+     "profile": "/jsUPFmY1HlML92ubVtSE8L8ovz6.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-496243",
+     "name": "寄生虫.2160p.HDR.mkv",
+     "path": "/电影/寄生虫",
+     "size": 0
+    }
+   ],
+   "addedAt": 1790735757505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:13",
+   "type": "movie",
+   "tmdbId": 13,
+   "title": "阿甘正传",
+   "year": 1994,
+   "overview": "阿甘出生在美国南方阿拉巴马州一个闭塞的小镇，智商只有75，然而他的妈妈是一位性格坚强的女性，她常常鼓励阿甘要自强不息。阿甘像普通孩子一样上学，并认识了一生的朋友和挚爱珍妮。在珍妮和妈妈的爱护下，阿甘凭着自己出众的奔跑能力，开始了一生不停的奔跑。他先后成为橄榄球明星、越战英雄、乒乓球外交使者和亿万富翁，但始终忘不了珍妮。一次次匆匆的相聚与离别，更加深了阿甘对她的思念。有一天，阿甘收到珍妮的来信，他们终于又要见面……",
+   "genres": [
+    "喜剧",
+    "剧情",
+    "爱情"
+   ],
+   "rating": 8.5,
+   "runtime": 142,
+   "certification": "PG-13",
+   "poster": "/xGEKFYixC7L4Mjhkq4dTwhmBlRI.jpg",
+   "backdrop": "/66Kn4XWhkuPkJxOJyPEx4U2CUfN.jpg",
+   "logo": "/9GLKlv1x0duKEij6KJeP37a4ozn.png",
+   "art": {
+    "color": "#8a9ba9",
+    "posterBlurHash": "LLR3K8-;_NMx~W%fIoaK%2f,R%V@",
+    "backdropBlurHash": "LOKVaZ~qI^nN_4skRjg4I]V@V@kW"
+   },
+   "cast": [
+    {
+     "name": "汤姆·汉克斯",
+     "character": "Forrest Gump",
+     "profile": "/oFvZoKI6lvU03n4YoNGAll9rkas.jpg"
+    },
+    {
+     "name": "罗宾·怀特",
+     "character": "Jenny Curran",
+     "profile": "/d3rIv0y2p0jMsQ7ViR7O1606NZa.jpg"
+    },
+    {
+     "name": "加里·西尼斯",
+     "character": "Lieutenant Dan Taylor",
+     "profile": "/olRjiV8ZhBixQiTvrGwXhpVXxsV.jpg"
+    },
+    {
+     "name": "莎莉·菲尔德",
+     "character": "Mrs. Gump",
+     "profile": "/iMeq1j9Xwvaf6PbTJ0FQz69fpuA.jpg"
+    },
+    {
+     "name": "麦凯尔泰·威廉逊",
+     "character": "Bubba Blue",
+     "profile": "/dR16zD9AjnHWbeN5OVmJWE0vSax.jpg"
+    },
+    {
+     "name": "迈克尔·康纳·汉弗莱斯",
+     "character": "Young Forrest Gump",
+     "profile": "/irYRs3COggVHg91jL3CrlCIWmnx.jpg"
+    },
+    {
+     "name": "汉娜·豪尔",
+     "character": "Young Jenny Curran",
+     "profile": "/xkZ2Hwz1QLXvQCgGlWgVgx00Rtd.jpg"
+    },
+    {
+     "name": "海利·乔·奥斯蒙",
+     "character": "Forrest Junior",
+     "profile": "/2rnMTQB9Q3vLtmRyyUaenVwSgfY.jpg"
+    },
+    {
+     "name": "西奥本·法隆·霍根",
+     "character": "School Bus Driver",
+     "profile": "/5OExagnRsUcOYLMPTSrv4x2G95R.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-13",
+     "name": "阿甘正传.2160p.HDR.mkv",
+     "path": "/电影/阿甘正传",
+     "size": 0
+    }
+   ],
+   "addedAt": 1790476557505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "movie:680",
+   "type": "movie",
+   "tmdbId": 680,
+   "title": "低俗小说",
+   "year": 1994,
+   "overview": "由序幕、尾声及三个独立又环环相扣的故事构成。早餐店两名劫匪打劫时，偶遇黑道打手朱尔斯与文森特；文森特奉命陪伴老大马沙的妻子，深陷诱惑困境；拳击手布奇因祖传金表，和马沙结下恩怨。",
+   "genres": [
+    "惊悚",
+    "犯罪",
+    "喜剧"
+   ],
+   "rating": 8.5,
+   "runtime": 154,
+   "certification": "R21",
+   "poster": "/WZW5PCtCbtyKfojdLlPCi89DNx.jpg",
+   "backdrop": "/suaEOtk1N1sgg2MTM7oZd2cfVp3.jpg",
+   "logo": "/kjYgVH4RTXQpiSSRmNS7ky8IOvs.png",
+   "art": {
+    "color": "#3d321d",
+    "posterBlurHash": "LTHTN#a0I[M{[:xtnPV[}XRjnjxZ",
+    "backdropBlurHash": "L89Z_zDicE01$f-:4:-;4mxuM|%M"
+   },
+   "cast": [
+    {
+     "name": "约翰·特拉沃尔塔",
+     "character": "Vincent Vega",
+     "profile": "/ap8eEYfBKTLixmVVpRlq4NslDD5.jpg"
+    },
+    {
+     "name": "塞缪尔·杰克逊",
+     "character": "Jules Winnfield",
+     "profile": "/AiAYAqwpM5xmiFrAIeQvUXDCVvo.jpg"
+    },
+    {
+     "name": "乌玛·瑟曼",
+     "character": "Mia Wallace",
+     "profile": "/sBgAZWi3o4FsnaTvnTNtK6jpQcF.jpg"
+    },
+    {
+     "name": "布鲁斯·威利斯",
+     "character": "Butch Coolidge",
+     "profile": "/w3aXr1e7gQCn8MSp1vW4sXHn99P.jpg"
+    },
+    {
+     "name": "文·瑞姆斯",
+     "character": "Marsellus Wallace",
+     "profile": "/tOVDvu1EQP78AwaUw6uh1wN818E.jpg"
+    },
+    {
+     "name": "哈维·凯特尔",
+     "character": "The Wolf",
+     "profile": "/7P30hza1neYWW3r7rSQOC736K2Z.jpg"
+    },
+    {
+     "name": "艾瑞克·斯托罗兹",
+     "character": "Lance",
+     "profile": "/idFuM00MeVmwGAiqvDaJcBiLAmD.jpg"
+    },
+    {
+     "name": "蒂姆·罗斯",
+     "character": "Pumpkin",
+     "profile": "/qSizF2i9gz6c6DbAC5RoIq8sVqX.jpg"
+    },
+    {
+     "name": "阿曼达·普拉莫",
+     "character": "Honey Bunny",
+     "profile": "/wEwyajjePFVVn2wFdH1NH7z9Qn5.jpg"
+    }
+   ],
+   "files": [
+    {
+     "fid": "demo-680",
+     "name": "低俗小说.2160p.HDR.mkv",
+     "path": "/电影/低俗小说",
+     "size": 0
+    }
+   ],
+   "addedAt": 1790217357505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "tv:1396",
+   "type": "tv",
+   "tmdbId": 1396,
+   "title": "绝命毒师",
+   "year": 2008,
+   "overview": "高中化学教师沃尔特·怀特被诊断患有晚期癌症，为保障家人经济生活，他与学生杰西制毒贩毒，并逐渐坠落至万劫不复的深渊。",
+   "genres": [
+    "剧情",
+    "犯罪"
+   ],
+   "rating": 9.0,
+   "certification": "M18",
+   "poster": "/rqliuvX7NdknSHu5qaSDfESplQi.jpg",
+   "backdrop": "/tsRy63Mu5cu8etL1X7ZLyf7UP1M.jpg",
+   "logo": "/8O0ehztG7GaNRFmx9amxsgDto5e.png",
+   "art": {
+    "color": "#3d6869",
+    "posterBlurHash": "LLA,~}bF02a$%Kj?NKWXWHWBjEt7",
+    "backdropBlurHash": "LLFs0nI[M_kWCm%LtRjF4;tQbway"
+   },
+   "cast": [
+    {
+     "name": "布莱恩·克兰斯顿",
+     "character": "Walter White",
+     "profile": "/7Jahy5LZX2Fo8fGJltMreAI49hC.jpg"
+    },
+    {
+     "name": "亚伦·保尔",
+     "character": "Jesse Pinkman",
+     "profile": "/8Ac9uuoYwZoYVAIJfRLzzLsGGJn.jpg"
+    },
+    {
+     "name": "安娜·冈",
+     "character": "Skyler White",
+     "profile": "/adppyeu1a4REN3khtgmXusrapFi.jpg"
+    },
+    {
+     "name": "RJ·米特",
+     "character": "Walter White Jr.",
+     "profile": "/sNPA92ZrssYhlaB1UA2pWcLD9db.jpg"
+    },
+    {
+     "name": "迪恩·诺里斯",
+     "character": "Hank Schrader",
+     "profile": "/mKRrEbsxAX3ro700HsViFArRM7l.jpg"
+    },
+    {
+     "name": "贝琪·勃兰特",
+     "character": "Marie Schrader",
+     "profile": "/xAnuzyjdMbQq9L1c4JNwXL52Wm4.jpg"
+    },
+    {
+     "name": "鲍勃·奥登科克",
+     "character": "Saul Goodman",
+     "profile": "/rF0Lb6SBhGSTvjRffmlKRSeI3jE.jpg"
+    },
+    {
+     "name": "乔纳森·班克斯",
+     "character": "Mike Ehrmantraut",
+     "profile": "/bswk26L13PvY4iMTwUTAsepXCLv.jpg"
+    },
+    {
+     "name": "史蒂文·迈克尔·奎扎达",
+     "character": "Steven Gomez",
+     "profile": "/pVYrDkwI6GWvCNL2kJhpDJfBFyd.jpg"
+    }
+   ],
+   "seasons": [
+    {
+     "number": 1,
+     "name": "第 1 季",
+     "episodes": [
+      {
+       "season": 1,
+       "episode": 1,
+       "title": "向导",
+       "overview": "当一位谦逊的高中化学老师发现自己患有一种罕见的肺癌时，他决定与一名以前的学生合作，在一辆二手房车中制造顶级冰毒，以便在他离开后养家糊口。",
+       "still": "/ydlY3iPfeOAvu8gVqrxPoMvzNCn.jpg",
+       "runtime": 59,
+       "files": [
+        {
+         "fid": "demo-1396-1",
+         "name": "S01E01.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 2,
+       "title": "猫在袋子里……",
+       "overview": "沃尔特和杰西试图捆绑松散的衣服。随着硬币的翻转，绝望的情况变得更加复杂。沃尔特的妻子斯凯勒开始怀疑沃尔特的奇怪行为。",
+       "still": "/AbMoecO0ZZio0LcgeLxlzdyGs6X.jpg",
+       "runtime": 49,
+       "files": [
+        {
+         "fid": "demo-1396-2",
+         "name": "S01E02.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 3,
+       "title": "...袋子在河里",
+       "overview": "沃尔特与杰西因吸毒而争吵，导致他将沃尔特单独留在他们的俘虏Krazy-8身边。与此同时，小沃尔特（ Walter Jr. ）的阿姨发现自己一直在抽大麻，汉克（ Hank ）与小沃尔特（ Walter Jr. ）此外，当Walter离开家时， Skylar感到不安。",
+       "still": "/n8Dah3Tc1vlc4i7bQ9zYPWaFO0e.jpg",
+       "runtime": 49,
+       "files": [
+        {
+         "fid": "demo-1396-3",
+         "name": "S01E03.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 4,
+       "title": "巨蟹座男人",
+       "overview": "沃尔特终于告诉他的家人，他已经患上了癌症。与此同时，缉毒局认为阿尔伯克基有一个新的，重要的球员需要担心。与此同时，一个有价值的接受者成为沃尔特沮丧愤怒的目标，杰西突然拜访了他父母的家。",
+       "still": "/i5BAJVhuIWfkoSqDID6FnQNCTVc.jpg",
+       "runtime": 49,
+       "files": [
+        {
+         "fid": "demo-1396-4",
+         "name": "S01E04.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 5,
+       "title": "灰质",
+       "overview": "沃尔特和斯凯勒参加了一位前同事的聚会。杰西试图摆脱毒品，而斯凯勒则组织干预。",
+       "still": "/82G3wZgEvZLKcte6yoZJahUWBtx.jpg",
+       "runtime": 49,
+       "files": [
+        {
+         "fid": "demo-1396-5",
+         "name": "S01E05.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 6,
+       "title": "一文不名的穷光蛋",
+       "overview": "化疗的副作用开始困扰沃尔特。与此同时，缉毒局围捕了可疑的经销商。",
+       "still": "/j5DgXgtZcA6fioFyaFzdqlt3t6.jpg",
+       "runtime": 49,
+       "files": [
+        {
+         "fid": "demo-1396-6",
+         "name": "S01E06.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 7,
+       "title": "没有粗糙的东西类型的交易",
+       "overview": "Walter在PTA会议后接受了他作为毒贩的新身份。在其他地方， Jesse决定将他姑姑的房子投放市场，而Skyler则接受了婴儿淋浴。",
+       "still": "/1dgFAsajUpUT7DLXgAxHb9GyXHH.jpg",
+       "runtime": 48,
+       "files": [
+        {
+         "fid": "demo-1396-7",
+         "name": "S01E07.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "addedAt": 1793064957505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "tv:1399",
+   "type": "tv",
+   "tmdbId": 1399,
+   "title": "权力的游戏",
+   "year": 2011,
+   "overview": "改编自乔治·R·R·马丁的奇幻小说系列《冰与火之歌》。维斯特洛大陆上，七大贵族家族为争夺铁王座展开斗争。权谋、战争与背叛不断交织，各方势力为统治七大王国展开生死较量。",
+   "genres": [
+    "科幻奇幻",
+    "剧情",
+    "动作冒险"
+   ],
+   "rating": 8.5,
+   "certification": "R21",
+   "poster": "/38mXOIoDceMzlcbuNClVnVYvSiY.jpg",
+   "backdrop": "/zZqpAXxVSBtxV9qPBcscfXBcL2w.jpg",
+   "logo": "/sTnOD9PLMfZbKTH8sjl7pOwqOgX.png",
+   "art": {
+    "color": "#1b1f24",
+    "posterBlurHash": "L36a-ct700M{?bofM|RjIUWBMxt8",
+    "backdropBlurHash": "L33bp^ae8^t7t8ayRiofI9j[x]ax"
+   },
+   "cast": [
+    {
+     "name": "彼特·丁拉基",
+     "character": "Tyrion 'The Halfman' Lannister",
+     "profile": "/9CAd7wr8QZyIN0E7nm8v1B6WkGn.jpg"
+    },
+    {
+     "name": "基特·哈灵顿",
+     "character": "Jon Snow",
+     "profile": "/iGXlJbExWwZmo9sUDsYuzf4Sv4y.jpg"
+    },
+    {
+     "name": "尼古拉·科斯特-瓦尔道",
+     "character": "Sir Jaime 'Kingslayer' Lannister",
+     "profile": "/rpFOERbHkj7GWxkinUNiQ76sSGk.jpg"
+    },
+    {
+     "name": "琳娜·海蒂",
+     "character": "Cersei Lannister",
+     "profile": "/cDyZLf8ddz0EgoUjpv4jjzy7qxA.jpg"
+    },
+    {
+     "name": "艾米莉亚·克拉克",
+     "character": "Daenerys Targaryen",
+     "profile": "/iFY6t7Ux9r70WB7Sp0TTVz6eGtm.jpg"
+    },
+    {
+     "name": "麦茜·威廉姆斯",
+     "character": "Arya Stark",
+     "profile": "/zk1rlBVci2fmnFhMezaPpa4kwZF.jpg"
+    },
+    {
+     "name": "艾萨克·亨普斯特德·赖特",
+     "character": "Brandon 'Bran' Stark",
+     "profile": "/g6ZreLmGrrOzaUCGVFRNPAWfcso.jpg"
+    },
+    {
+     "name": "苏菲·特纳",
+     "character": "Sansa Stark",
+     "profile": "/8ur4aHFakVCinWk0cvrGO8qAUhv.jpg"
+    },
+    {
+     "name": "伊恩·格雷",
+     "character": "Ser Jorah Mormont",
+     "profile": "/d9CKAAiV1HvSnzzmpDzD0mC0HlX.jpg"
+    }
+   ],
+   "seasons": [
+    {
+     "number": 1,
+     "name": "第 1 季",
+     "episodes": [
+      {
+       "season": 1,
+       "episode": 1,
+       "title": "凛冬将至",
+       "overview": "劳勃国王在一位忠臣死后，前往北方延请史塔克爵士投入自己麾下。同时，流亡王子韦塞里斯想把妹妹丹妮莉丝送去和番，只为巩固自己的兵力。",
+       "still": "/o4IX9Mm0kpLITVANJMx7inyEUaY.jpg",
+       "files": [
+        {
+         "fid": "demo-1399-1",
+         "name": "S01E01.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 2,
+       "title": "国王大道",
+       "overview": "布兰坠楼后奇迹似地活了下来，瑟曦与詹姆无所不用其极地想致他于死地，以免布兰揭发他们的恶行。",
+       "still": "/l0GJx3IR8YasbztTJi5uK0XqkEo.jpg",
+       "runtime": 56,
+       "files": [
+        {
+         "fid": "demo-1399-2",
+         "name": "S01E02.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 3,
+       "title": "雪诺大人",
+       "overview": "瑟曦与詹姆思索布兰清醒所带来的后果；而艾莉亚则努力练习剑术。丹妮莉丝和韦赛里斯在前往多斯拉奇草原的路上发生冲突。",
+       "still": "/8HjOlb4slc1xusMgOtoNpxuTgSI.jpg",
+       "runtime": 58,
+       "files": [
+        {
+         "fid": "demo-1399-3",
+         "name": "S01E03.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 4,
+       "title": "跛子、杂种、残缺之人",
+       "overview": "奈德在书中寻找前任首相死亡的线索，却发现了劳勃国王的私生子。劳勃与其宾客举行了一场为了荣耀奈德就任的比武竞技。",
+       "still": "/Ai2UPMWv38xGjOgNBuA1o8w8dUI.jpg",
+       "runtime": 56,
+       "files": [
+        {
+         "fid": "demo-1399-4",
+         "name": "S01E04.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 5,
+       "title": "狮狼之争",
+       "overview": "听到丹妮莉丝与多斯拉克人结盟的消息，愤怒的劳勃国王下令先发制人攻打坦格利安家族，却使得他跟奈德的关系出现阴影。",
+       "still": "/u7e1qSWE6v8jfY9vGNrckX47DGN.jpg",
+       "runtime": 55,
+       "files": [
+        {
+         "fid": "demo-1399-5",
+         "name": "S01E05.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 6,
+       "title": "黄金冠冕",
+       "overview": "重新复职首相的奈德在劳勃国王外出狩猎时暂代其职。奈德颁布了一道法令，对七大王国可能会产生深远的影响。",
+       "still": "/eU7iftaj8ZTy4WADhEURDM75CSv.jpg",
+       "runtime": 53,
+       "files": [
+        {
+         "fid": "demo-1399-6",
+         "name": "S01E06.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 7,
+       "title": "成王败寇",
+       "overview": "泰温‧兰尼斯特公爵在准备战事时向詹姆解释兰尼斯特家的命运全系于此，并且逼迫他「成为他本应成为的那个人」。",
+       "still": "/o6ldSDhIINGNKZR62mHf2m64dD.jpg",
+       "runtime": 58,
+       "files": [
+        {
+         "fid": "demo-1399-7",
+         "name": "S01E07.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 8,
+       "title": "针锋相对",
+       "overview": "奈德被捕下狱，西利欧与艾莉亚对上兰尼斯特守卫，而瑟曦企图操弄珊莎供她利用。罗勃‧史塔克召集艾德在北境的盟友对抗泰温公爵，朝南方发动战争。",
+       "still": "/hH0U1QISWGGjoFutvCLdw28MGiq.jpg",
+       "runtime": 59,
+       "files": [
+        {
+         "fid": "demo-1399-8",
+         "name": "S01E08.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 9,
+       "title": "贝勒大圣堂",
+       "overview": "因为珊莎的生命受到威胁，奈德做出了宿命性的决定。凯特琳与狡猾的瓦德‧弗雷达成了一桩不名誉的协议",
+       "still": "/fAmBhmw1pQc6fucrdmnRM5FOpXD.jpg",
+       "runtime": 57,
+       "files": [
+        {
+         "fid": "demo-1399-9",
+         "name": "S01E09.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 10,
+       "title": "血火同源",
+       "overview": "悲剧传遍了七大王国，此时，布兰与瑞肯共同作了一个预言梦；凯特琳为了布兰的坠楼而审问詹姆，而罗勃的命运也将永远改变。",
+       "still": "/y1BXkhEqBQS3ewQeqqdHpjhTts0.jpg",
+       "runtime": 53,
+       "files": [
+        {
+         "fid": "demo-1399-10",
+         "name": "S01E10.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "addedAt": 1792632957505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "tv:209867",
+   "type": "tv",
+   "tmdbId": 209867,
+   "title": "葬送的芙莉莲",
+   "year": 2023,
+   "overview": "打倒了魔王的勇者一行人的后日谈——在“那之后”的故事。身为魔法使的芙莉莲是一位精灵，她和另外三人有着不一样的地方。对于生活在“之后”的世界、感受到的事情有着不一样的看法……残存世间的人们所编织的，葬送与祈祷相伴的故事——从“冒险的结束”开始了。",
+   "genres": [
+    "动画",
+    "动作冒险",
+    "剧情",
+    "科幻奇幻"
+   ],
+   "rating": 8.8,
+   "certification": "NC16",
+   "poster": "/1TtrtRIwXz5BB0gXEl8zgBypl9c.jpg",
+   "backdrop": "/rBOnrVlck7BIlGeWVlzYiZeg4l2.jpg",
+   "logo": "/v8Mtd07kXtjJeWLCOdyTuRU1SLG.png",
+   "art": {
+    "color": "#6a9fb0",
+    "posterBlurHash": "LfAejvtRITRPMHozt6WqX8V?jFof",
+    "backdropBlurHash": "LSJSwbz-S[D$I~I9a0VaPQMyiwtk"
+   },
+   "cast": [
+    {
+     "name": "种崎敦美",
+     "character": "Frieren (voice)",
+     "profile": "/6tM8GU7QvrdUCvR4kxqVUZivtvO.jpg"
+    },
+    {
+     "name": "市之濑加那",
+     "character": "Fern (voice)",
+     "profile": "/hBJx5tpLA2vkXqfkPZosGjW4e8C.jpg"
+    },
+    {
+     "name": "小林千晃",
+     "character": "Stark (voice)",
+     "profile": "/o0XZFXc50z28ICUpvfZ1QcTL2Yt.jpg"
+    },
+    {
+     "name": "冈本信彦",
+     "character": "Himmel (voice)",
+     "profile": "/7s1K2yQVF5iIWILaOfG7QrMZkXA.jpg"
+    },
+    {
+     "name": "东地宏树",
+     "character": "Heiter (voice)",
+     "profile": "/bU2vogWmnTWiQEwUADWlnBqAPhJ.jpg"
+    },
+    {
+     "name": "上田耀司",
+     "character": "Eisen (voice)",
+     "profile": "/fHvIfE0Q7ab0DFlkNVFcXvTKX9y.jpg"
+    },
+    {
+     "name": "小畑正文",
+     "character": "Aide-de-camp (voice), Villager (voice), Magic Shop Owner (voice), Mining Worker (voice)和7 更多...",
+     "profile": "/rsIFdHICaG7iIfG7AhQuPTc7s0B.jpg"
+    },
+    {
+     "name": "齐藤次郎",
+     "character": "Denken (voice)",
+     "profile": "/tPHXGZ7a1ZoWghbAFki4PxBBCIN.jpg"
+    },
+    {
+     "name": "白石兼斗",
+     "character": "Butler (voice), Merchant (voice), Funeral Attendee (voice), Falsch (voice)和5 更多...",
+     "profile": "/kQheInTNjl06xWak4kGQjPGzr4h.jpg"
+    }
+   ],
+   "seasons": [
+    {
+     "number": 1,
+     "name": "第 1 季",
+     "episodes": [
+      {
+       "season": 1,
+       "episode": 1,
+       "title": "冒险的结束",
+       "overview": "英雄辛美尔一行人击败了魔王，凯旋王都。当他们纷纷回顾过去十年的冒险并思考未来的生活时，精灵芙莉莲不为所动，并投入到另一场对魔法的研究。时光荏苒，同伴们相继老去，只有芙莉莲容颜不改。50年后的一天，与同伴相约再聚的芙莉莲回到首都。在这次重逢过后，她决定踏上新的旅程，去寻找自己新的意义。",
+       "still": "/7SfqQVmW125ugsktoRVTnRXpAkd.jpg",
+       "runtime": 26,
+       "files": [
+        {
+         "fid": "demo-209867-1",
+         "name": "S01E01.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 2,
+       "title": "也不一定要是魔法…",
+       "overview": "芙莉莲拜访了住在森林深处的海塔，并见到了与他住在一起的孤儿菲伦。海塔请芙莉莲教她魔法。后来，因为某件事，他们一起踏上了旅程。在旅行时，芙莉莲参观了一个有辛美尔雕像的村庄，并想起了辛美尔生前说过他喜欢的花……",
+       "still": "/jVeDv4dZI5KbRQw3eD8RRiojUZ5.jpg",
+       "runtime": 26,
+       "files": [
+        {
+         "fid": "demo-209867-2",
+         "name": "S01E02.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 3,
+       "title": "杀人魔法",
+       "overview": "芙莉莲和菲伦抵达贸易城市瓦尔姆。菲伦对芙莉莲的行为产生了怀疑，并决定跟踪她。芙莉莲的目的是什么？随后，两人来到了某个村庄。芙莉莲和辛美尔曾经战斗过的恶魔夸尔被封印在那里。",
+       "still": "/5uVpkiIoMRCDaLcAxfG8Gc7VJWo.jpg",
+       "runtime": 25,
+       "files": [
+        {
+         "fid": "demo-209867-3",
+         "name": "S01E03.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 4,
+       "title": "灵魂安眠之地",
+       "overview": "芙莉莲和菲伦拜访了艾泽。一番叙旧过后，艾泽请求他们帮助自己找到“大魔法师伏拉梅的回忆录”。于是他们三人来到森林深处，那里躺着海塔生前发现的回忆录。然而，他们被告知，大部分所谓的伏拉梅回忆录都是假的。那么，那个地方的回忆录到底是假的还是……？",
+       "still": "/nYFUXvyrxCRwcOdIiqRdLJtVScj.jpg",
+       "runtime": 26,
+       "files": [
+        {
+         "fid": "demo-209867-4",
+         "name": "S01E04.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 5,
+       "title": "死者的幻影",
+       "overview": "芙莉莲与菲伦决定朝着伏拉梅留下的手记中所记载的地点“灵魂长眠之地”前进，便与艾泽道别并踏上旅途。究竟在如今魔王城所在的那个地方，能否与辛美尔说上话呢……途中，两人造访了某个村子后，听到村民说有好几个人遭到幽灵带走而失踪的消息……",
+       "still": "/ioJWXpvWXAEjK1ues1ZZBwdYOA0.jpg",
+       "runtime": 25,
+       "files": [
+        {
+         "fid": "demo-209867-5",
+         "name": "S01E05.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 6,
+       "title": "村子的英雄",
+       "overview": "休塔尔克居住在里格尔峡谷附近的村庄，他因为从红镜龙手中保护了村子而被誉为村子的英雄，但其实他是个胆小鬼。即使如此，芙莉莲仍对他的实力抱有期望，而向他提议要一起打倒红镜龙。休塔尔克有着能劈开巨石的力量，他的手却会不停发抖。究竟他会不会出现在战场上呢？",
+       "still": "/veuq90RbYrizOYc6RWjZHqhf2ii.jpg",
+       "runtime": 25,
+       "files": [
+        {
+         "fid": "demo-209867-6",
+         "name": "S01E06.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 7,
+       "title": "童话故事般的人物",
+       "overview": "芙莉莲等人来到了一座城镇，当地在举办名为“解放祭”的祭典前夜祭。那里是过去芙莉莲与辛美尔等人从魔族手中保护的城镇。芙莉莲见到他们的铜像被建造于城镇中，想起了某件事。之后，芙莉莲造访古拉纳特伯爵治理的城镇，她却在那里突然朝某个人物举起法杖！",
+       "still": "/qTS0N4eauUgqa64LVXJoJjfvpo6.jpg",
+       "runtime": 25,
+       "files": [
+        {
+         "fid": "demo-209867-7",
+         "name": "S01E07.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 8,
+       "title": "葬送的芙莉莲",
+       "overview": "侍奉魔族阿乌拉的琉古纳他们来向古拉纳特伯爵提出和谈，芙莉莲由于企图对他们施放魔法，而被逮捕并送入监牢。琉古纳将做出此举的芙莉莲视为危险人物，同样隶属于阿乌拉的多拉特则盯上了芙莉莲的性命。菲伦与修塔尔克也为了救出芙莉莲展开行动。",
+       "still": "/6m8vHkqJ8lESCxneLeXPNq5V08f.jpg",
+       "runtime": 25,
+       "files": [
+        {
+         "fid": "demo-209867-8",
+         "name": "S01E08.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 9,
+       "title": "断头台阿乌拉",
+       "overview": "芙莉莲独自离开城镇，并与七崩贤“断头台阿乌拉”对峙。有着庞大魔力的阿乌拉操控死者军团，一个接一个向芙莉莲发起攻击。另一方面，菲伦与修塔尔克救出古拉纳特伯爵，但琉古纳与莉妮耶的魔爪也伸向了他们两人……芙莉莲一行人与阿乌拉军的战况即将白热化。",
+       "still": "/yUeaBIwxbsPSri1oVBr2hNXVPYQ.jpg",
+       "runtime": 25,
+       "files": [
+        {
+         "fid": "demo-209867-9",
+         "name": "S01E09.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 10,
+       "title": "强大的魔法使",
+       "overview": "大魔法使伏拉梅，存活于千年以前，身为人类却是在历史上被誉为“英雄”的魔法使。她某天在遭到魔王军袭击而全灭的精灵聚落中，遇见了独自幸存下来的芙莉莲。伏拉梅教导芙莉莲的事物究竟是……然后，芙莉莲与阿乌拉的战斗终于分出胜负。",
+       "still": "/5Sryn4O6eO6bsdWbz30NK84PrnQ.jpg",
+       "runtime": 25,
+       "files": [
+        {
+         "fid": "demo-209867-10",
+         "name": "S01E10.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "addedAt": 1792200957505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "tv:94997",
+   "type": "tv",
+   "tmdbId": 94997,
+   "title": "权力的游戏前传：龙族",
+   "year": 2022,
+   "overview": "在维斯特洛大陆，坦格利安家族的衰落被公之于众。一场被称为“血龙狂舞”的内战即将爆发。",
+   "genres": [
+    "科幻奇幻",
+    "剧情",
+    "动作冒险"
+   ],
+   "rating": 8.4,
+   "certification": "R21",
+   "poster": "/w5iFwPk6h9fv3zxLN2QkxVEVyBw.jpg",
+   "backdrop": "/577eXC8wFQT0eUrJcgznSiFPRmk.jpg",
+   "logo": "/f5XW96WOL31pzNrwzHha3HPTmzK.png",
+   "art": {
+    "color": "#27241e",
+    "posterBlurHash": "L37dd$~Ut7ae_3^*%1IV~B%LNHIV",
+    "backdropBlurHash": "L3558;%L9GIV?axtIVM{0LRkxaWV"
+   },
+   "cast": [
+    {
+     "name": "马特·史密斯",
+     "character": "Prince Daemon Targaryen",
+     "profile": "/wxMdHj4UA6LgIU5MiA7CKySZeVU.jpg"
+    },
+    {
+     "name": "史蒂夫·图森特",
+     "character": "Lord Corlys 'The Sea Snake' Velaryon",
+     "profile": "/9rJafPDkQP8YuLy9iY5v19ZfMIW.jpg"
+    },
+    {
+     "name": "水野索诺娅",
+     "character": "Mysaria 'The White Worm'",
+     "profile": "/WVROOHuk6G6QgVe0pU8R2i1fsE.jpg"
+    },
+    {
+     "name": "法比安·弗兰克尔",
+     "character": "Ser Criston Cole",
+     "profile": "/nXh1h7KbdeZc41ucwGhzp1cOMnd.jpg"
+    },
+    {
+     "name": "马修·尼达姆",
+     "character": "Lord Larys 'Clubfoot' Strong",
+     "profile": "/sZHT2xFtnBawU3DoaWZACSv15gX.jpg"
+    },
+    {
+     "name": "库尔特·埃贾万",
+     "character": "Grand Maester Orwyle, Maester Orwyle",
+     "profile": "/bLzmxAmUxRj8wwxzlpaKKdg2Ccf.jpg"
+    },
+    {
+     "name": "奥利维亚·库克",
+     "character": "Queen Alicent Hightower",
+     "profile": "/wf71ctooNlVmiT8dxx0QmRAzyiX.jpg"
+    },
+    {
+     "name": "艾玛·达西",
+     "character": "Princess Rhaenyra Targaryen (voice), Queen Rhaenyra Targaryen",
+     "profile": "/9Zlmb7VmtVCxkLq5yqFFRRxCaED.jpg"
+    },
+    {
+     "name": "伊万·米切尔",
+     "character": "Prince Aemond Targaryen",
+     "profile": "/v1PqysDnx5umfA2DqGyjwuAxc9C.jpg"
+    }
+   ],
+   "seasons": [
+    {
+     "number": 1,
+     "name": "第 1 季",
+     "episodes": [
+      {
+       "season": 1,
+       "episode": 1,
+       "title": "龙的传人",
+       "overview": "韦赛里斯主办了一场比武大赛以庆祝他第二个孩子的诞生。雷妮拉欢迎自己的叔叔戴蒙从红堡归来。",
+       "still": "/3oumSnkavc4pcMFvPbgWDUTclNb.jpg",
+       "files": [
+        {
+         "fid": "demo-94997-1",
+         "name": "S01E01.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 2,
+       "title": "流氓王子",
+       "overview": "雷妮拉在御前会议中做出了逾举的行为。韦赛里斯被催促着透过再婚来确保继承权。戴蒙终于公布了他的意图。",
+       "still": "/vJfVCJ3ZgVUfbUZBoeHdLVeJzjL.jpg",
+       "runtime": 54,
+       "files": [
+        {
+         "fid": "demo-94997-2",
+         "name": "S01E02.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 3,
+       "title": "继任之人",
+       "overview": "戴蒙联手海蛇与螃蟹喂食者展开了大战。举国欢庆伊耿的第二命名日。雷妮拉面临了婚姻的抉择。",
+       "still": "/fP1HCPFgwfXCcGHhjhgf0sndWAH.jpg",
+       "files": [
+        {
+         "fid": "demo-94997-3",
+         "name": "S01E03.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 4,
+       "title": "狭海之王",
+       "overview": "雷妮拉缩短了她的维斯特洛之旅，戴蒙于入夜后带着公主来到了丝街。",
+       "still": "/mW2a20R8VZqENHAmz47x21FCoYV.jpg",
+       "files": [
+        {
+         "fid": "demo-94997-4",
+         "name": "S01E04.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 5,
+       "title": "指引明路",
+       "overview": "戴蒙前去拜访他位在谷地的妻子。韦赛里斯和雷妮拉与瓦列利安家族达成协议。阿莉森试图从公主身上得到真相。",
+       "still": "/8kgv0QAfICMGPqDD2dQvO9TR3AD.jpg",
+       "files": [
+        {
+         "fid": "demo-94997-5",
+         "name": "S01E05.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 6,
+       "title": "公主与王后",
+       "overview": "十年后，雷妮拉仍不断面对阿莉森对自己孩子真实血脉的臆测；戴蒙则与兰娜尔在潘托斯商量一项协议。",
+       "still": "/lcBTDoCkBTJAdi8VagMQdzB6RYi.jpg",
+       "files": [
+        {
+         "fid": "demo-94997-6",
+         "name": "S01E06.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 7,
+       "title": "潮头岛",
+       "overview": "家族成员前往潮头岛参加葬礼，韦赛里斯想终结成员之间的内斗，而阿莉森企图讨回公道。",
+       "still": "/4Lt8XaiyEkcSx0SRhn4GvhrzjHS.jpg",
+       "runtime": 59,
+       "files": [
+        {
+         "fid": "demo-94997-7",
+         "name": "S01E07.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 8,
+       "title": "潮汛之主",
+       "overview": "六年后，潮头岛的继承权归属成为了关键，雷妮拉试图向雷妮丝提出协议。",
+       "still": "/usZEKEHEn8o8FTBW7ksY2raH1zQ.jpg",
+       "files": [
+        {
+         "fid": "demo-94997-8",
+         "name": "S01E08.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 9,
+       "title": "绿党会议",
+       "overview": "当阿莉森派科尔和伊蒙德去寻找伊耿时，奥托召集了维斯特洛的各大家族以确保他们的忠诚。",
+       "still": "/9p0vHFLhh35dk9LvtSzzz6l5dAE.jpg",
+       "runtime": 58,
+       "files": [
+        {
+         "fid": "demo-94997-9",
+         "name": "S01E09.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 10,
+       "title": "黑色女王",
+       "overview": "在悼念之际，雷妮拉试图维系王国的和平，戴蒙则准备开战。",
+       "still": "/yt0vxevGHtSug3xxxEGCAk2XY1i.jpg",
+       "runtime": 59,
+       "files": [
+        {
+         "fid": "demo-94997-10",
+         "name": "S01E10.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "addedAt": 1791768957505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  },
+  {
+   "id": "tv:100088",
+   "type": "tv",
+   "tmdbId": 100088,
+   "title": "最后生还者",
+   "year": 2023,
+   "overview": "在现代文明被摧毁的二十年后，人类因现代传染病而面临绝种危机，幸存的人类为了生存自相残杀。中年男性走私犯乔尔（佩德罗·帕斯卡饰）为了完成“火萤”组织首领玛琳（梅尔·丹德里奇饰）的托付，带着14岁少女艾莉（贝拉·拉姆齐饰）一同踏出由军队保护的疫情隔离区，穿越化为废墟丛林的大都会。面对病毒感染变种人类与其他幸存者集团威胁，展开了一场改变两人一生的深刻旅程。",
+   "genres": [
+    "剧情"
+   ],
+   "rating": 8.4,
+   "certification": "R21",
+   "poster": "/ydyTjqxZsPlcFSTBNY2INYrmEvk.jpg",
+   "backdrop": "/lY2DhbA7Hy44fAKddr06UrXWWaQ.jpg",
+   "logo": "/crJXsphYaxa6cnnFNIleXX4NaXx.png",
+   "art": {
+    "color": "#26271d",
+    "posterBlurHash": "LQEML7Io4mM{-;jZD%WB01xtxut7",
+    "backdropBlurHash": "L97BM,02x[e.%fIVt7t6E2%LRjof"
+   },
+   "cast": [
+    {
+     "name": "贝拉·拉姆齐",
+     "character": "Ellie Williams",
+     "profile": "/vDbgxc7RYawpB1wK7JDEj62j06H.jpg"
+    },
+    {
+     "name": "佩德罗·帕斯卡",
+     "character": "Joel Miller, Joel Miller (uncredited)",
+     "profile": "/oKcMbVn0NJTNzQt0ClKKvVXkm60.jpg"
+    },
+    {
+     "name": "加布里埃尔·鲁纳",
+     "character": "Tommy Miller",
+     "profile": "/bIPORtYxTJPEUJIThbZrpqf4A11.jpg"
+    },
+    {
+     "name": "伊莎贝拉·莫塞德",
+     "character": "Dina",
+     "profile": "/7O5GWIH8IHwU4kGZIhC3JkGDiZr.jpg"
+    },
+    {
+     "name": "扬·马齐诺",
+     "character": "Jesse",
+     "profile": "/cRuVRx1DMe2hBkz5pssVqdpCtaQ.jpg"
+    },
+    {
+     "name": "鲁蒂娜·韦斯利",
+     "character": "Maria",
+     "profile": "/ujpdNAKxlv6TRI2mm0k3eSSZJkB.jpg"
+    },
+    {
+     "name": "塞缪尔·霍克塞马",
+     "character": "Museum Clicker, Clicker",
+     "profile": "/6TEscmA3aFBkdWX2DuozcUhHkBK.jpg"
+    },
+    {
+     "name": "丹尼·拉米雷斯",
+     "character": "Manny Alvarez",
+     "profile": "/7ZvcfWA5O5ULiupbHZtGGEPwnpI.jpg"
+    },
+    {
+     "name": "罗伯特·约翰·伯克",
+     "character": "Seth",
+     "profile": "/uWEaY5gypb6cp1bdUYG4uCKw4sK.jpg"
+    }
+   ],
+   "seasons": [
+    {
+     "number": 1,
+     "name": "第 1 季",
+     "episodes": [
+      {
+       "season": 1,
+       "episode": 1,
+       "title": "迷失在黑暗之中",
+       "overview": "2003年，寄生真菌的爆发肆虐了全世界，乔尔米勒试图带着女儿和弟弟逃离越演越烈的混乱局面。20年后，乔尔与泰丝努力在集权主义下求生存。而叛乱组织“火萤”则收容了一位天赋异禀的少女。",
+       "still": "/3VeY1k8wFyhcrMyQ8jpGegh9beU.jpg",
+       "files": [
+        {
+         "fid": "demo-100088-1",
+         "name": "S01E01.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 2,
+       "title": "染病",
+       "overview": "2003年，印度的科学家有了毁灭性的发现。2023年的隔离区外，波士顿早已成了废墟；当乔尔与泰丝试着从感染者中逃离时，他们因艾莉的命运起了冲突。",
+       "still": "/vGf7chl6XL7o3yYc8A5m3kjz8px.jpg",
+       "runtime": 53,
+       "files": [
+        {
+         "fid": "demo-100088-2",
+         "name": "S01E02.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 3,
+       "title": "很久很久以后",
+       "overview": "末日生存者比尔准备好独自一人在末世生活，一名神秘的陌生人却打乱了他的计划。多年后，乔尔与艾莉试图寻求比尔的帮助，并发现他们站在了命运的十字路口。",
+       "still": "/fmaiMjbLXaeRyq2so0EXf3hrpyc.jpg",
+       "files": [
+        {
+         "fid": "demo-100088-3",
+         "name": "S01E03.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 4,
+       "title": "请握住我的手",
+       "overview": "历经千辛万苦长途跋涉横越荒凉的美国之后，乔尔与艾莉徒步穿越危机重重的堪萨斯城。随后，反抗军领袖凯瑟琳展开了一场追捕行动，她手下暴力的民兵令拯救世界的希望备受威胁。",
+       "still": "/nYPkaj0a5m4Y9xHdDADtnzh6zOL.jpg",
+       "runtime": 47,
+       "files": [
+        {
+         "fid": "demo-100088-4",
+         "name": "S01E04.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 5,
+       "title": "忍耐，活下去",
+       "overview": "在刚重获自由的堪萨斯城街道上，反抗军士兵奉无情的领袖之命对山姆发起攻击，亨利为了保护弟弟而战。随着追捕行动的升温，凯瑟琳也越来越渴求复仇。同时，艾莉与某人展开了一段充满意义的友谊。",
+       "still": "/ztzxqW4IAVQRVimxhIfryP4CuI9.jpg",
+       "files": [
+        {
+         "fid": "demo-100088-5",
+         "name": "S01E05.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 6,
+       "title": "血浓于水",
+       "overview": "旅程又过了好几个月，乔尔与艾莉收到了关于未来的严正警告。不久之后，艾莉对乔尔的过去有了更多了解；但对乔尔来说，他只想忘掉一切。",
+       "still": "/zW9AIy0PVhYfmukqBcUvlvi4mKc.jpg",
+       "files": [
+        {
+         "fid": "demo-100088-6",
+         "name": "S01E06.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 7,
+       "title": "被留下的人们",
+       "overview": "乔尔为求生而努力奋斗，艾莉在拯救他的过程中想起在对策局孤儿院的回忆。在遇到乔尔的几周前，艾莉与好友莱莉一起度过了最美好的一夜；而这份回忆将永远改变两人以及全世界的命运。",
+       "still": "/oNyC68bnOoVAiJnKVsRNY9YDbl6.jpg",
+       "runtime": 57,
+       "files": [
+        {
+         "fid": "demo-100088-7",
+         "name": "S01E07.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 8,
+       "title": "在我们有需要时",
+       "overview": "一群怀恨在心的生存者与艾莉相遇，她努力奋斗的模样吸引了其中的领袖不必要的注意。命在旦夕的乔尔挣扎求生，面临嗜血的狩猎集团威胁。",
+       "still": "/iNbhbEOt1KAeqr5iyL9QOAZzgzT.jpg",
+       "runtime": 52,
+       "files": [
+        {
+         "fid": "demo-100088-8",
+         "name": "S01E08.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      },
+      {
+       "season": 1,
+       "episode": 9,
+       "title": "寻找那道光",
+       "overview": "经历了被感染者的追杀后，大腹便便的安娜将希望寄托在挚友身上。几年后，艾莉被迫面对自己这段旅程所累积下来的创伤，而乔尔则面临自己的一个毁灭性决定。",
+       "still": "/4WZ9E8IGl9tkka9JPh325Lc1kfh.jpg",
+       "runtime": 46,
+       "files": [
+        {
+         "fid": "demo-100088-9",
+         "name": "S01E09.mkv",
+         "path": "/剧集",
+         "size": 0
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "addedAt": 1791336957505,
+   "match": {
+    "source": "demo",
+    "confidence": 1.0
+   }
+  }
+ ]
+}

@@ -114,6 +114,20 @@ fun main(argv: Array<String>) {
                     Thread.sleep(config.scan.intervalMinutes * 60_000L)
                 }
             }
+            // 给片库 JSON 补主色调和 BlurHash (生成演示数据用)
+            "enrich" -> {
+                val file = File(args.first())
+                val lib = LibraryCodec.json.decodeFromString(quarkflix.library.Library.serializer(), file.readText())
+                val images = Images(httpClient(null), File(home, "cache/images"))
+                val items = lib.items.map { item ->
+                    val poster = images.analyze(item.poster)
+                    val backdrop = images.analyze(item.backdrop, "w300")
+                    println("${item.title}: ${backdrop.color ?: poster.color}")
+                    item.copy(art = quarkflix.library.Artwork(backdrop.color ?: poster.color, poster.blurHash, backdrop.blurHash))
+                }
+                val pretty = kotlinx.serialization.json.Json(LibraryCodec.json) { prettyPrint = true }
+                file.writeText(pretty.encodeToString(quarkflix.library.Library.serializer(), lib.copy(items = items)))
+            }
             else -> { println(USAGE); exitProcess(1) }
         }
     } catch (e: Exception) {

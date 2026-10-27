@@ -387,7 +387,7 @@ class Scraper(
             originalTitle = d.displayOriginal?.takeIf { it != d.displayTitle },
             year = d.year,
             overview = d.overview?.takeIf { it.isNotBlank() },
-            genres = d.genres.map { it.name },
+            genres = d.genres.map { GENRE_ZH[it.name] ?: it.name },
             rating = d.voteAverage?.takeIf { it > 0 }?.let { Math.round(it * 10) / 10.0 },
             runtime = d.runtime ?: d.episodeRunTime.firstOrNull(),
             certification = certification,
@@ -544,6 +544,20 @@ class Scraper(
         drive.delete(old.map { it.fid })
         log("索引已写入 /${LibraryCodec.DIR}/$name")
         return name
+    }
+
+    private companion object {
+        /** TMDB 剧集类型有几个没有中文翻译. */
+        val GENRE_ZH = mapOf(
+            "Sci-Fi & Fantasy" to "科幻奇幻",
+            "Action & Adventure" to "动作冒险",
+            "War & Politics" to "战争政治",
+            "Kids" to "儿童",
+            "News" to "新闻",
+            "Reality" to "真人秀",
+            "Soap" to "肥皂剧",
+            "Talk" to "脱口秀",
+        )
     }
 
     private fun indexByFid(lib: Library): Map<String, Pair<MediaType, Int>> {

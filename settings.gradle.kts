@@ -16,3 +16,4 @@ rootProject.name = "quarkflix"
 include(":quark")
 include(":library")
 include(":scraper")
+include(":app")

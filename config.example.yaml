@@ -1,0 +1,49 @@
+# 复制到 ~/.quarkflix/config.yaml
+# 登录态 (cookie/token) 不放这里, 用 `quarkflix-scraper login` 存到 ~/.quarkflix/state.json
+
+defaults:
+  output: index+nfo          # index / index+nfo / index+full
+  existing_nfo: trust        # trust / merge / ignore / overwrite
+  recognize: rules+ai        # rules / rules+ai / ai
+  confidence_threshold: 0.85 # 低于这个写进报告, 建议人工确认
+  language: zh-CN
+  fallback_language: en-US
+
+tmdb:
+  api_key: ""                # https://www.themoviedb.org/settings/api, v3 key 或 v4 read token 都行
+  proxy: http://127.0.0.1:7890   # api.themoviedb.org 国内要代理 (mac mini 上的 mihomo)
+
+ai:
+  provider: deepseek         # none / deepseek / anthropic / openai (OpenAI 兼容, 如 Ollama)
+  # model: deepseek-chat     # 不填按 provider 默认: deepseek-chat / claude-opus-5
+  api_key: ""
+  # base_url: http://127.0.0.1:11434/v1   # provider=openai 时用
+  # proxy: http://127.0.0.1:7890          # anthropic 国内要代理, deepseek 不用
+  # effort: low                           # 只对 anthropic 生效
+
+rate_limit:
+  list_per_sec: 2
+  upload_per_sec: 1
+
+scan:
+  interval_minutes: 30
+  keep_indexes: 5
+
+libraries:
+  - path: /电影
+    type: movie
+  - path: /剧集
+    type: tv
+  - path: /动漫
+    type: tv
+    recognize: ai            # 字幕组文件名乱, 全交给 AI
+  # - path: /来自分享
+  #   type: auto
+  #   output: index          # 不往这个目录里写东西
+  #   existing_nfo: merge
+
+# 识别错了在这里修正, 路径可以是目录或文件
+overrides: []
+#  - path: /电影/沙丘 (1984)
+#    type: movie
+#    tmdb_id: 841

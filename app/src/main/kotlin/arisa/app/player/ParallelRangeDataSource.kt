@@ -21,10 +21,15 @@ import java.util.concurrent.Future
  *
  * 夸克对一直读到文件末尾的 `Range: bytes=N-` 限速到 100KB/s 左右 (SVIP 也一样),
  * 有上下界的 `bytes=N-M` 能跑满 (实测单连接 8~10MB/s).
+ *
+ * [contentLength] 是文件大小 (取直链时夸克给的): 请求的结束位置超过文件末尾时, 夸克不按 Range 返回,
+ * 而是 200 加整个文件, 播放器就得从头读过去. MP4 的索引在文件末尾时 (先读末尾再回来播) 会卡住不动,
+ * 所以每段都要裁到文件末尾为止.
  */
 @UnstableApi
 class ParallelRangeDataSource(
     private val upstream: DataSource.Factory,
+    private val contentLength: Long? = null,
     private val concurrency: Int = 3,
     private val partSize: Long = 10L * 1024 * 1024,
 ) : DataSource {
@@ -51,13 +56,18 @@ class ParallelRangeDataSource(
     override fun open(dataSpec: DataSpec): Long {
         spec = dataSpec
         executor = Executors.newFixedThreadPool(concurrency)
-        // 第一段同步下, 顺便从 Content-Range 拿到文件总长度
-        val first = fetch(dataSpec, 0, if (dataSpec.length == C.LENGTH_UNSET.toLong()) partSize else minOf(partSize, dataSpec.length), headers = true)
-        total = if (dataSpec.length != C.LENGTH_UNSET.toLong()) dataSpec.length else {
-            responseHeaders.entries.firstOrNull { it.key.equals("Content-Range", true) }?.value?.firstOrNull()
-                ?.substringAfter('/')?.toLongOrNull()?.minus(dataSpec.position)
-                ?: first.size.toLong()
+        // 要读的长度: 播放器指定的, 或者到文件末尾
+        val known = when {
+            dataSpec.length != C.LENGTH_UNSET.toLong() -> dataSpec.length
+            contentLength != null -> contentLength - dataSpec.position
+            else -> null
         }
+        if (known != null && known <= 0) return 0
+        // 第一段同步下; 不知道文件大小时从 Content-Range 拿
+        val first = fetch(dataSpec, 0, if (known == null) partSize else minOf(partSize, known), headers = true)
+        total = known ?: responseHeaders.entries.firstOrNull { it.key.equals("Content-Range", true) }?.value?.firstOrNull()
+            ?.substringAfter('/')?.toLongOrNull()?.minus(dataSpec.position)
+            ?: first.size.toLong()
         current = first
         currentPos = 0
         nextOffset = first.size.toLong()
@@ -146,8 +156,8 @@ class ParallelRangeDataSource(
         spec = null
     }
 
-    class Factory(private val upstream: DataSource.Factory) : DataSource.Factory {
-        override fun createDataSource(): DataSource = ParallelRangeDataSource(upstream)
+    class Factory(private val upstream: DataSource.Factory, private val contentLength: Long?) : DataSource.Factory {
+        override fun createDataSource(): DataSource = ParallelRangeDataSource(upstream, contentLength)
     }
 
     private companion object {

@@ -216,7 +216,7 @@ class PlaybackSession(
                 .setSubtitleConfigurations(subtitles)
                 .build()
             // DefaultDataSource 包一层, 外挂字幕是本地文件; 网络部分分段并发读 (夸克对不分段的请求限速)
-            player.setMediaSource(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, ParallelRangeDataSource.Factory(http))).createMediaSource(media), positionMs)
+            player.setMediaSource(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, ParallelRangeDataSource.Factory(http, link.size))).createMediaSource(media), positionMs)
             player.prepare()
             player.playWhenReady = true
             loading = false

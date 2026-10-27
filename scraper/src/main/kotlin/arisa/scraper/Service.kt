@@ -334,7 +334,8 @@ class Service(
         }
         val ws = watchState()
         val latest = maxOf(records.maxOfOrNull { it.time } ?: 0, ws.lastSeen)
-        val latestRecycled = maxOf(recycled.maxOfOrNull { it.time } ?: 0, ws.lastRecycled)
+        // 至少记成 1, 和「从没看过回收站」的 0 区分开
+        val latestRecycled = maxOf(recycled.maxOfOrNull { it.time } ?: 1, ws.lastRecycled)
         if (ws.lastSeen == 0L) {
             // 第一次运行只记下位置, 启动时本来就会扫描
             saveWatch(ws.copy(lastSeen = latest, lastRecycled = latestRecycled))

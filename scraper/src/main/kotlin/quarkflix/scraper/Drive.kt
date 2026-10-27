@@ -12,6 +12,7 @@ interface Drive {
     fun upload(parentFid: String, name: String, bytes: ByteArray): String
     fun delete(fids: List<String>)
     fun mkdir(parentFid: String, name: String): String
+    fun rename(fid: String, newName: String)
 
     fun resolve(path: String): QuarkFile? {
         var current = QuarkFile(rootFid, "", true, 0, 0, 0)
@@ -46,6 +47,7 @@ class QuarkDrive(private val client: QuarkWebClient, rate: RateLimit) : Drive {
         retry { writeLimiter.acquire(); client.upload(parentFid, name, bytes) }
     override fun delete(fids: List<String>) { if (fids.isNotEmpty()) retry { writeLimiter.acquire(); client.delete(fids) } }
     override fun mkdir(parentFid: String, name: String) = retry { writeLimiter.acquire(); client.mkdir(parentFid, name) }
+    override fun rename(fid: String, newName: String) = retry { writeLimiter.acquire(); client.rename(fid, newName) }
 
     private fun <T> retry(block: () -> T): T {
         var attempt = 0
@@ -86,5 +88,10 @@ class LocalDrive(private val root: File) : Drive {
         val f = File(file(parentFid), name)
         f.mkdirs()
         return f.relativeTo(root).path
+    }
+
+    override fun rename(fid: String, newName: String) {
+        val f = file(fid)
+        check(f.renameTo(File(f.parentFile, newName))) { "rename failed: $fid" }
     }
 }

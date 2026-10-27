@@ -22,11 +22,28 @@ object FilenameParser {
 
     /** 季目录, 如 "Season 01" "S2" "第一季". */
     fun seasonOfDir(name: String): Int? {
-        SEASON_DIR.matchEntire(name.trim())?.let { m ->
+        val n = name.trim()
+        SEASON_DIR.matchEntire(n)?.let { m ->
             return m.groupValues[1].ifEmpty { m.groupValues[2] }.let(::parseNumber)
         }
+        // "第一季（2013）全13集 内封字幕": 以第几季开头, 后面只是描述
+        SEASON_DIR_PREFIX.find(n)?.let { return parseNumber(it.groupValues[1]) }
         return null
     }
+
+    /**
+     * 不含片名信息的目录: 画质 (4K、1080P)、版本 (日语版、粤语版)、花絮之类.
+     * 找片名和剧集根目录时跳过.
+     */
+    fun isNoiseDir(name: String): Boolean {
+        if (VERSION_DIR.matches(name.trim())) return true
+        val p = parseText(name)
+        return p.titles.isEmpty() && p.episode == null
+    }
+
+    /** 花絮、片头片尾、菜单、预告等, 不入库. */
+    fun isExtra(fileName: String, parents: List<String>): Boolean =
+        EXTRA_FILE.containsMatchIn(fileName.substringBeforeLast('.')) || parents.any { EXTRA_DIR.matches(it.trim()) }
 
     /**
      * @param fileName 文件名 (含扩展名)
@@ -35,8 +52,10 @@ object FilenameParser {
     fun parse(fileName: String, parents: List<String> = emptyList()): ParsedName {
         val own = parseText(fileName.substringBeforeLast('.'))
         // 文件名里没有片名 (如 "E05.mkv" "01.mkv"), 往上找目录名
-        val dirs = parents.asReversed().filter { seasonOfDir(it) == null }
+        val dirs = parents.asReversed().filter { seasonOfDir(it) == null && !isNoiseDir(it) }
+        // 没有别的目录时, "长相思 第一季" 这种季目录里也带着片名
         val dirParsed = dirs.firstOrNull()?.let { parseText(it) }
+            ?: parents.lastOrNull { seasonOfDir(it) != null }?.let { parseText(it) }?.takeIf { it.titles.isNotEmpty() }
         val seasonFromDir = parents.asReversed().firstNotNullOfOrNull { seasonOfDir(it) }
 
         val titles = when {
@@ -56,7 +75,11 @@ object FilenameParser {
 
     /** 解析一段文本 (文件名去扩展名, 或目录名). */
     fun parseText(raw: String): ParsedName {
-        var text = raw
+        // 网盘重名文件会加 "(1)" 后缀; 「」里是单集标题; 开头的 "X " 是按首字母排序加的前缀
+        var text = raw.replace(DUPLICATE_SUFFIX, "")
+            .replace(EPISODE_TITLE, " ")
+            .replace(INDEX_PREFIX, "")
+            .replace(DESCRIPTION, " ")
         var season: Int? = null
         var episode: Int? = null
         var year: Int? = null
@@ -112,6 +135,12 @@ object FilenameParser {
             }
         }
         if (episode == null) {
+            HASH_EPISODE.find(text)?.let { m ->
+                episode = m.groupValues[1].toInt()
+                text = text.substring(0, m.range.first)
+            }
+        }
+        if (episode == null) {
             EP_FORMAT.find(text)?.let { m ->
                 episode = m.groupValues[1].toInt()
                 text = text.substring(0, m.range.first)
@@ -147,6 +176,12 @@ object FilenameParser {
         }
 
         val title = words.joinToString(" ").trim(' ', '-', '–', '·', ',', '。')
+        // 去掉标签后只剩数字: "01 4K.mp4" "178 4K.mp4"
+        if (episode == null) {
+            BARE_NUMBER.matchEntire(title)?.let { m ->
+                return ParsedName(emptyList(), year, season, m.groupValues[1].toInt())
+            }
+        }
         return ParsedName(splitTitles(title), year, season, episode)
     }
 
@@ -218,6 +253,12 @@ object FilenameParser {
     private const val CLOSE = "]】)）》"
     private val WS = Regex("\\s+")
     private val CRC = Regex("[0-9A-Fa-f]{8}")
+    private val DUPLICATE_SUFFIX = Regex("\\(\\d{1,2}\\)$")
+    private val VERSION_DIR = Regex("(日语|日文|粤语|国语|英语|原声|中配|日配)版?|(新|旧|原|导演剪辑|加长|完整|未删减)版")
+    private val EXTRA_FILE = Regex(
+        "(?i)(?<![A-Za-z])(NC(OP|ED)\\d*|menu\\d*|PV\\d*|CM\\d*|preview|trailer|sample|teaser)(?![A-Za-z])|tokuten|预告|花絮|特典|彩蛋|片头曲|片尾曲|无字幕?(OP|ED)"
+    )
+    private val EXTRA_DIR = Regex("(?i)backdrops|theme-music|trailers|featurettes|behind the scenes|deleted scenes|interviews|scenes|shorts|SPs?|Extras?|CDs?|Scans?|Menus?|Bonus|特典|花絮|OP|ED|OP&?ED|NC(OP|ED)?|PVs?|CMs?|音乐|原声|OST|漫画|小说|字幕|Fonts?|Subs?")
     private val BARE_NUMBER = Regex("(?:EP?)?(\\d{1,3})", RegexOption.IGNORE_CASE)
     private val YEAR_ONLY = Regex("(19\\d{2}|20\\d{2})")
     private val YEAR_WORD = Regex("\\(?((?:19|20)\\d{2})\\)?")
@@ -228,6 +269,11 @@ object FilenameParser {
     private val CN_EPISODE = Regex("第\\s*([0-9一二两三四五六七八九十零]+)\\s*[集话話期]")
     private val CN_SEASON = Regex("第\\s*([0-9一二两三四五六七八九十]+)\\s*季")
     private val SEASON_WORD = Regex("(?<![A-Za-z])(?:Season[ ._-]?|S)(\\d{1,2})(?!\\d)(?![EeXx])", RegexOption.IGNORE_CASE)
+    private val SEASON_DIR_PREFIX = Regex("^(?:\\d{1,2}[.、 ]\\s*)?(?:\\S*?\\s)?第\\s*([0-9一二两三四五六七八九十]+)\\s*季")
+    private val HASH_EPISODE = Regex("#(\\d{1,4})(?!\\d)")
+    private val EPISODE_TITLE = Regex("[「『][^」』]*[」』]")
+    private val INDEX_PREFIX = Regex("^[A-Z][ _](?=[^A-Za-z ])")
+    private val DESCRIPTION = Regex("全\\s*\\d+\\s*[集季话話部]|\\d+\\s*-\\s*\\d+\\s*[集季]|附\\S*|[内外][封挂嵌]、?[内外]?[封挂嵌]?字幕|\\d+部合集|合集")
     private val SEASON_DIR = Regex("(?:Season[ ._-]?|S)(\\d{1,2})|第\\s*([0-9一二两三四五六七八九十]+)\\s*季", RegexOption.IGNORE_CASE)
     private val CJK_THEN_LATIN = Regex("([^A-Za-z]*[\\p{IsHan}\\p{IsHiragana}\\p{IsKatakana}][^A-Za-z]*?)\\s*([A-Za-z].*)")
 

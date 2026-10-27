@@ -26,8 +26,11 @@ private const val USAGE = """quarkflix-scraper <命令> [参数]
 
 刮削:
   parse <文件名>...          只跑规则解析, 看结果
+  inspect <网盘目录>         只读遍历目录, 用规则解析每个视频 (不调 TMDB, 不写网盘)
   scan [--dry-run] [--out 文件]   扫描一次
   daemon                    常驻, 按 scan.interval_minutes 定时扫描
+  rename                    生成改名计划 ~/.quarkflix/rename-plan.txt (不改网盘)
+  rename --apply            按计划文件改名
 
 选项:
   --config <文件>   默认 ~/.quarkflix/config.yaml
@@ -101,10 +104,51 @@ fun main(argv: Array<String>) {
                 println("已删除")
             }
             "parse" -> args.forEach { println("$it\n  → ${FilenameParser.parse(it.substringAfterLast('/'), it.split('/').dropLast(1))}") }
+            "inspect" -> {
+                val drive = QuarkDrive(web(state), RateLimit())
+                val root = drive.resolve(args.first()) ?: error("路径不存在")
+                fun walk(fid: String, path: String, dirs: List<String>) {
+                    for (f in drive.list(fid)) {
+                        if (f.isDir) walk(f.fid, "$path/${f.name}", dirs + f.name)
+                        else if (FilenameParser.isVideo(f.name) && !FilenameParser.isExtra(f.name, dirs)) {
+                            val p = FilenameParser.parse(f.name, dirs)
+                            val se = if (p.episode != null) " S${p.season}E${p.episode}" else ""
+                            println("${p.titles.joinToString(" | ").ifEmpty { "(无片名)" }}${p.year?.let { " ($it)" } ?: ""}$se\t$path/${f.name}")
+                        }
+                    }
+                }
+                walk(root.fid, args.first().trimEnd('/'), emptyList())
+            }
             "scan" -> {
                 val dry = args.remove("--dry-run")
                 val out = takeOption(args, "--out")?.let(::File)
                 scanOnce(Config.load(configFile), state, write = !dry, out = out)
+            }
+            "rename" -> {
+                val planFile = File(home, "rename-plan.txt")
+                val config = Config.load(configFile)
+                if (args.remove("--apply")) {
+                    require(planFile.exists()) { "没有计划文件, 先运行 rename" }
+                    val plans = planFile.readLines().mapNotNull(RenamePlan::parse)
+                    val (done, skipped) = scraper(config, state).applyRenames(plans)
+                    println("改名 $done 个")
+                    skipped.forEach { println("跳过: $it") }
+                    println("改完后运行一次 scan 更新索引")
+                } else {
+                    val (_, report) = scraper(config, state).run(write = false)
+                    planFile.writeText(buildString {
+                        appendLine("# 改名计划, 确认后运行 quarkflix-scraper rename --apply")
+                        appendLine("# 不想改的行删掉即可; 最后一列有内容的是跳过的及原因")
+                        appendLine("# fid\t父目录fid\t父目录\t原名\t新名\tTMDB\t跳过原因")
+                        report.renames.sortedWith(compareBy({ it.skipped != null }, { it.parentPath }, { it.from }))
+                            .forEach { appendLine(it.toLine()) }
+                    })
+                    val (todo, skip) = report.renames.partition { it.skipped == null }
+                    todo.forEach { println("${it.parentPath}/${it.from}\n    → ${it.to}") }
+                    if (skip.isNotEmpty()) println("\n跳过 ${skip.size} 个:")
+                    skip.forEach { println("  ${it.parentPath}/${it.from}: ${it.skipped}") }
+                    println("\n计划已写到 $planFile, 确认后运行 rename --apply")
+                }
             }
             "daemon" -> {
                 while (true) {
@@ -136,15 +180,19 @@ fun main(argv: Array<String>) {
     }
 }
 
-private fun scanOnce(config: Config, state: StateStore, write: Boolean, out: File?) {
+private fun scraper(config: Config, state: StateStore): Scraper {
     require(config.tmdb.apiKey.isNotBlank()) { "config.yaml 里没有 tmdb.api_key" }
     val drive = QuarkDrive(web(state), config.rateLimit)
     val tmdbHttp = httpClient(config.tmdb.proxy)
     val tmdb = Tmdb(config.tmdb.apiKey, tmdbHttp, File(home, "cache/tmdb"))
     val ai = Ai(config.ai).takeIf { it.enabled }
     val images = Images(tmdbHttp, File(home, "cache/images"))
+    return Scraper(config, drive, tmdb, ai, images)
+}
+
+private fun scanOnce(config: Config, state: StateStore, write: Boolean, out: File?) {
     val start = System.currentTimeMillis()
-    val (library, report) = Scraper(config, drive, tmdb, ai, images).run(write)
+    val (library, report) = scraper(config, state).run(write)
 
     out?.let { it.writeBytes(LibraryCodec.encode(library)); println("索引另存到 $it") }
     // 给人看的报告: 没识别的、拿不准的
@@ -156,6 +204,9 @@ private fun scanOnce(config: Config, state: StateStore, write: Boolean, out: Fil
         report.unmatched.forEach { appendLine(it) }
         appendLine("\n== 置信度低, 建议人工确认 (${report.lowConfidence.size}) ==")
         report.lowConfidence.forEach { appendLine(it) }
+        val renames = report.renames.filter { it.skipped == null }
+        appendLine("\n== 建议改名 (${renames.size}), 用 rename 命令生成计划 ==")
+        renames.forEach { appendLine("${it.parentPath}/${it.from} → ${it.to}") }
     })
     println("报告: $reportFile")
 }

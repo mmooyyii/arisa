@@ -48,7 +48,32 @@ data class ScanReport(
     val lowConfidence: List<String>,
     val nfoWritten: Int,
     val indexFile: String?,
+    val renames: List<RenamePlan> = emptyList(),
 )
+
+/**
+ * 改名建议: 把作品目录改成 "片名 (年份)". [skipped] 不为 null 时只是说明为什么不改.
+ * 落到计划文件里, 确认后按 fid 执行, 不会改到计划之外的东西.
+ */
+data class RenamePlan(
+    val fid: String,
+    val parentFid: String,
+    val parentPath: String,
+    val from: String,
+    val to: String,
+    val tmdb: String,
+    val skipped: String? = null,
+) {
+    fun toLine() = listOf(fid, parentFid, parentPath, from, to, tmdb, skipped ?: "").joinToString("\t")
+
+    companion object {
+        fun parse(line: String): RenamePlan? {
+            val p = line.split('\t')
+            if (p.size < 7 || line.startsWith("#")) return null
+            return RenamePlan(p[0], p[1], p[2], p[3], p[4], p[5], p[6].ifEmpty { null })
+        }
+    }
+}
 
 class Scraper(
     private val config: Config,
@@ -106,13 +131,39 @@ class Scraper(
         val library = Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched)
         log("识别 ${items.size} 部, 未识别 ${unmatched.size} 个文件")
 
+        val renames = planRenames(units, matches, items, effective)
+
         var nfoWritten = 0
         var indexName: String? = null
         if (write) {
             nfoWritten = writeNfos(units, matches, items, effective)
             indexName = writeIndex(library)
         }
-        return library to ScanReport(items.size, unmatched.map { it.path }, lowConfidence.toList(), nfoWritten, indexName)
+        return library to ScanReport(items.size, unmatched.map { it.path }, lowConfidence.toList(), nfoWritten, indexName, renames)
+    }
+
+    /** 按计划文件改名. 执行前核对 fid 和原名, 网盘里已经变了的跳过. 返回 (成功, 跳过的原因). */
+    fun applyRenames(plans: List<RenamePlan>): Pair<Int, List<String>> {
+        var done = 0
+        val skipped = mutableListOf<String>()
+        for ((parentFid, group) in plans.filter { it.skipped == null }.groupBy { it.parentFid }) {
+            val siblings = drive.list(parentFid)
+            for (p in group) {
+                val current = siblings.firstOrNull { it.fid == p.fid }
+                when {
+                    current == null -> skipped += "${p.parentPath}/${p.from}: 已不存在"
+                    current.name == p.to -> {}
+                    current.name != p.from -> skipped += "${p.parentPath}/${p.from}: 名字已变成 ${current.name}"
+                    siblings.any { it.fid != p.fid && it.name == p.to } -> skipped += "${p.parentPath}/${p.from}: 已有同名 ${p.to}"
+                    else -> {
+                        drive.rename(p.fid, p.to)
+                        log("改名 ${p.parentPath}/${p.from} → ${p.to}")
+                        done++
+                    }
+                }
+            }
+        }
+        return done to skipped
     }
 
     // ---------- 扫描 ----------
@@ -123,14 +174,11 @@ class Scraper(
             if (c.isDir) {
                 if (c.name.startsWith(".")) continue
                 walk(lib, c, "$path/${c.name}", dirs + c, out)
-            } else if (FilenameParser.isVideo(c.name) && !isExtra(c.name)) {
+            } else if (FilenameParser.isVideo(c.name) && !FilenameParser.isExtra(c.name, dirs.map { it.name })) {
                 out += ScannedFile(c, "$path/${c.name}", lib, dirs, children)
             }
         }
     }
-
-    /** 预告片、花絮之类不入库. */
-    private fun isExtra(name: String) = Regex("(?i)(-trailer|-sample|sample\\.|预告|花絮)").containsMatchIn(name)
 
     private fun group(lib: LibraryConfig, files: List<ScannedFile>): List<Work> {
         val units = mutableListOf<Work>()
@@ -148,10 +196,10 @@ class Scraper(
                 units += Work(MediaType.MOVIE, listOf(f), null, emptyList(), p)
                 continue
             }
-            // 剧集根目录: tv 片库取第一层目录; auto 取最近的非季目录
+            // 剧集根目录: tv 片库取第一层目录; auto 取最近的非季、非画质/版本目录
             val showDir = when (lib.type) {
                 LibraryType.TV -> f.dirs.firstOrNull()
-                else -> f.dirs.lastOrNull { FilenameParser.seasonOfDir(it.name) == null }
+                else -> f.dirs.lastOrNull { FilenameParser.seasonOfDir(it.name) == null && !FilenameParser.isNoiseDir(it.name) }
             }
             val key = showDir?.fid ?: "title:${p.titles.firstOrNull()?.lowercase() ?: f.file.fid}"
             tvGroups.getOrPut(key) { mutableListOf() } += f to p
@@ -419,7 +467,15 @@ class Scraper(
             val p = FilenameParser.parse(f.file.name, f.parentNames)
             Triple(f, p.season ?: 1, p.episode)
         }
-        val seasons = located.groupBy { it.second }.toSortedMap().map { (number, list) ->
+        // 有的资源按绝对集数编号 (第二季目录里是 26~50 集), 换算成季内集数
+        val seasonCounts = d.seasons.filter { it.seasonNumber > 0 }.associate { it.seasonNumber to it.episodeCount }
+        fun relative(season: Int, ep: Int?): Int? {
+            val count = seasonCounts[season] ?: return ep
+            if (ep == null || ep <= count) return ep
+            val offset = (1 until season).sumOf { seasonCounts[it] ?: 0 }
+            return if (ep - offset in 1..count) ep - offset else ep
+        }
+        val seasons = located.map { (f, s, e) -> Triple(f, s, relative(s, e)) }.groupBy { it.second }.toSortedMap().map { (number, list) ->
             val sd = runCatching { tmdb.season(id, number, eff.language) }.getOrNull()
             val known = sd?.episodes.orEmpty().associateBy { it.episodeNumber }
             val episodes = list.groupBy { it.third }.map { (ep, fs) ->
@@ -439,6 +495,77 @@ class Scraper(
             Season(number, sd?.name ?: summary?.name, sd?.overview?.takeIf { it.isNotBlank() }, sd?.posterPath ?: summary?.posterPath, episodes)
         }
         return base(MediaType.TV, d, eff, match, files).copy(seasons = seasons)
+    }
+
+    // ---------- 改名 ----------
+
+    /**
+     * 只改作品所在的顶层目录; 顶层目录里有多部作品时当合集, 改下一层每部的目录.
+     * 置信度不够、目录里有没识别的文件、改完会重名的, 都只记录不改.
+     */
+    private fun planRenames(
+        units: List<Work>,
+        matches: Map<Work, Match?>,
+        items: List<MediaItem>,
+        effective: Map<Work, Config.Effective>,
+    ): List<RenamePlan> {
+        val itemById = items.associateBy { it.id }
+        // 每个文件对应的作品, 没识别或置信度不够的为 null
+        val entries = units.flatMap { u ->
+            val m = matches[u]
+            val id = m?.takeIf { it.confidence >= effective.getValue(u).confidenceThreshold }
+                ?.let { "${if (u.kind == MediaType.MOVIE) "movie" else "tv"}:${it.tmdbId}" }
+            u.files.map { it to id }
+        }.filter { (f, _) -> f.dirs.isNotEmpty() }
+
+        val plans = mutableListOf<RenamePlan>()
+        val rootFids = mutableMapOf<String, String>()
+        fun plan(dir: QuarkFile, parentFid: String, parentPath: String, ids: Set<String?>) {
+            val item = ids.singleOrNull()?.let { itemById[it] }
+            val skip = when {
+                null in ids && ids.size > 1 -> "部分文件没识别出来"
+                null in ids -> "没识别出来"
+                item == null -> "没识别出来"
+                else -> null
+            }
+            val to = item?.let { targetName(it) } ?: ""
+            if (skip == null && to == dir.name) return
+            plans += RenamePlan(dir.fid, parentFid, parentPath, dir.name, to, item?.let { "${it.id} ${it.title}" } ?: "", skip)
+        }
+
+        entries.groupBy { (f, _) -> f.library.path.trimEnd('/') to f.dirs[0] }.forEach { (key, list) ->
+            val (libPath, top) = key
+            val rootFid = rootFids.getOrPut(libPath) { drive.resolve(libPath)!!.fid }
+            val ids = list.map { it.second }.toSet()
+            val known = ids.filterNotNull()
+            if (known.size <= 1) {
+                plan(top, rootFid, libPath, ids)
+            } else {
+                // 合集: 保留合集目录, 改下一层
+                list.filter { (f, _) -> f.dirs.size >= 2 }.groupBy { (f, _) -> f.dirs[1] }.forEach { (child, cl) ->
+                    val childIds = cl.map { it.second }.toSet()
+                    // 下一层里还是多部作品的 (如 "剧场版" 目录), 不再往下改
+                    if (childIds.filterNotNull().size <= 1) plan(child, top.fid, "$libPath/${top.name}", childIds)
+                }
+            }
+        }
+
+        // 改完会和同目录其他目录重名的不改
+        return plans.groupBy { it.parentFid }.flatMap { (parentFid, group) ->
+            val siblings = drive.list(parentFid)
+            group.map { p ->
+                if (p.skipped != null) return@map p
+                val clash = siblings.any { it.fid != p.fid && it.name == p.to } ||
+                    group.count { it.skipped == null && it.to == p.to } > 1
+                if (clash) p.copy(skipped = "改完会重名") else p
+            }
+        }
+    }
+
+    /** "片名 (年份)", 去掉网盘不允许的字符. */
+    private fun targetName(item: MediaItem): String {
+        val title = item.title.replace('/', '／').replace('\\', '＼').replace(':', '：').replace(Regex("[*?\"<>|]"), "").trim()
+        return if (item.year != null) "$title (${item.year})" else title
     }
 
     // ---------- 写网盘 ----------

@@ -25,7 +25,7 @@ data class ScannedFile(
     val siblings: List<QuarkFile>,
 ) {
     val parentNames get() = dirs.map { it.name }
-    val mediaFile get() = MediaFile(file.fid, file.name, path, file.size, file.updatedAt)
+    val mediaFile get() = MediaFile(file.fid, file.name, path, file.size, file.updatedAt, file.duration, Subtitles.of(file, siblings))
 }
 
 /** 一次扫描的结果. */
@@ -55,6 +55,8 @@ data class PendingWork(
     val path: String,
     val fileCount: Int,
     val samples: List<String>,
+    /** 每个示例文件的时长 (分钟), 和 samples 一一对应, 0 表示不知道. 电影通常 80 分钟以上, 剧集单集一般不到 60 分钟. */
+    val minutes: List<Int> = emptyList(),
     /** 从片库往下的各级目录 (名字和 fid), 想把整个目录映射过去时用. */
     val dirs: List<PendingDir>,
     val rules: PendingParse,
@@ -174,12 +176,16 @@ class Scraper(
                     .onFailure { if (it is TmdbAuthException) throw it }
                     .getOrDefault(emptyList())
             } else emptyList()
+            val samples = w.files
+                .map { it.path.removePrefix(w.displayPath).trimStart('/').ifEmpty { it.file.name } to (it.file.duration + 30) / 60 }
+                .distinctBy { it.first }.take(8)
             PendingWork(
                 key = w.key,
                 guess = if (w.kind == MediaType.MOVIE) "movie" else "tv",
                 path = w.displayPath,
                 fileCount = w.files.size,
-                samples = w.files.map { it.path.removePrefix(w.displayPath).trimStart('/').ifEmpty { it.file.name } }.distinct().take(8),
+                samples = samples.map { it.first },
+                minutes = samples.map { it.second },
                 dirs = w.first.dirs.map { PendingDir(it.fid, it.name) },
                 rules = PendingParse(w.parsed.titles, w.parsed.year, w.parsed.season, w.parsed.episode),
                 nfo = nfoTarget(w),

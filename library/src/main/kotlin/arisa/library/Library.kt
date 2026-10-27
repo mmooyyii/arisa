@@ -110,6 +110,18 @@ data class MediaFile(
     val path: String,
     val size: Long,
     val updatedAt: Long = 0,
+    /** 时长, 秒, 0 表示不知道. */
+    val duration: Int = 0,
+    /** 视频旁边的外挂字幕. */
+    val subtitles: List<SubtitleFile> = emptyList(),
+)
+
+@Serializable
+data class SubtitleFile(
+    val fid: String,
+    val name: String,
+    /** 从文件名猜的语言, BCP 47 (zh-Hans / zh-Hant / zh / en / ja …), 猜不出为 null. */
+    val language: String? = null,
 )
 
 @Serializable

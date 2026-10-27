@@ -23,6 +23,10 @@ data class QuarkFile(
     /** 夸克生成的缩略图 (视频是一帧截图), 没有时为 null. */
     val thumbnail: String? = null,
     val parentFid: String? = null,
+    /** 视频时长, 秒. 夸克没算出来时为 0. */
+    val duration: Int = 0,
+    val width: Int = 0,
+    val height: Int = 0,
 )
 
 /** "最近" 里的一条记录: 一次转存、上传、播放等, 带涉及的文件. */

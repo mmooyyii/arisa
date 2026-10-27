@@ -118,14 +118,20 @@ class LocalDrive(private val root: File) : Drive {
  */
 class CachingDrive(private val inner: Drive, private val file: java.io.File) : Drive {
     @kotlinx.serialization.Serializable
-    private data class Cache(val listings: Map<String, List<QuarkFile>> = emptyMap(), val stale: Set<String> = emptySet())
+    private data class Cache(
+        val listings: Map<String, List<QuarkFile>> = emptyMap(),
+        val stale: Set<String> = emptySet(),
+        /** 文件字段有变化时加一, 旧缓存作废. */
+        val version: Int = 0,
+    )
 
     private val json = kotlinx.serialization.json.Json { ignoreUnknownKeys = true }
     private val listings: MutableMap<String, List<QuarkFile>>
     private val stale: MutableSet<String>
 
     init {
-        val cache = runCatching { json.decodeFromString(Cache.serializer(), file.readText()) }.getOrDefault(Cache())
+        val cache = runCatching { json.decodeFromString(Cache.serializer(), file.readText()) }.getOrNull()
+            ?.takeIf { it.version == VERSION } ?: Cache()
         listings = cache.listings.toMutableMap()
         stale = cache.stale.toMutableSet()
     }
@@ -179,7 +185,7 @@ class CachingDrive(private val inner: Drive, private val file: java.io.File) : D
     fun save() {
         file.parentFile.mkdirs()
         val tmp = java.io.File(file.path + ".tmp")
-        tmp.writeText(json.encodeToString(Cache.serializer(), Cache(listings, stale)))
+        tmp.writeText(json.encodeToString(Cache.serializer(), Cache(listings, stale, VERSION)))
         tmp.renameTo(file)
     }
 
@@ -208,5 +214,9 @@ class CachingDrive(private val inner: Drive, private val file: java.io.File) : D
     @Synchronized
     private fun invalidateParentsOf(fids: List<String>) {
         listings.forEach { (dir, l) -> if (l.any { it.fid in fids }) stale += dir }
+    }
+
+    companion object {
+        private const val VERSION = 1
     }
 }

@@ -79,7 +79,7 @@ class QuarkWebClient(
     }
 
     private fun WebFile.toQuarkFile() =
-        QuarkFile(fid, unescapeHtml(fileName), !file, size, category, updatedAt, thumbnail?.ifEmpty { null }, pdirFid?.ifEmpty { null })
+        QuarkFile(fid, unescapeHtml(fileName), !file, size, category, updatedAt, thumbnail?.ifEmpty { null }, pdirFid?.ifEmpty { null }, duration, videoWidth, videoHeight)
 
     /** 按 "/电影/沙丘" 这样的路径找文件或目录, 不存在返回 null. */
     fun resolve(path: String): QuarkFile? {
@@ -346,6 +346,9 @@ class QuarkWebClient(
         @SerialName("updated_at") val updatedAt: Long = 0,
         val thumbnail: String? = null,
         @SerialName("pdir_fid") val pdirFid: String? = null,
+        val duration: Int = 0,
+        @SerialName("video_width") val videoWidth: Int = 0,
+        @SerialName("video_height") val videoHeight: Int = 0,
     )
 
     @Serializable

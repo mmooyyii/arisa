@@ -18,6 +18,8 @@ data class QuarkFile(
     val category: Int,
     /** 毫秒时间戳. */
     val updatedAt: Long,
+    /** 夸克生成的缩略图 (视频是一帧截图), 没有时为 null. */
+    val thumbnail: String? = null,
 )
 
 /** 取到的播放/下载地址, 请求时要带上 [headers]. */
@@ -27,7 +29,10 @@ data class QuarkLink(
     val size: Long? = null,
 )
 
-class QuarkException(message: String) : Exception(message)
+open class QuarkException(message: String) : Exception(message)
+
+/** 登录态失效, 需要重新登录. */
+class QuarkAuthException(message: String) : QuarkException(message)
 
 internal val json = Json {
     ignoreUnknownKeys = true

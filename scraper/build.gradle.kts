@@ -16,7 +16,6 @@ dependencies {
     implementation(project(":quark"))
     implementation(project(":library"))
     implementation("com.charleskorn.kaml:kaml:0.104.0")
-    implementation("com.anthropic:anthropic-java:2.34.0")
     testImplementation(kotlin("test"))
 }
 

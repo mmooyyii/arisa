@@ -5,7 +5,7 @@
 defaults:
   output: index+nfo          # index / index+nfo / index+full
   existing_nfo: trust        # trust / merge / ignore / overwrite
-  recognize: rules+ai        # rules / rules+ai / ai
+  recognize: ai              # ai (默认, AI 为主) / rules+ai (规则失败才问 AI) / rules
   confidence_threshold: 0.85 # 低于这个写进报告, 建议人工确认
   language: zh-CN
   fallback_language: en-US
@@ -15,7 +15,7 @@ tmdb:
   # proxy: http://127.0.0.1:7890  # 一般不用: 默认走 api.tmdb.org, 国内能直连
 
 ai:
-  provider: deepseek         # none / deepseek / anthropic / openai (OpenAI 兼容, 如 Ollama)
+  provider: deepseek         # none / claude-code (本机 Claude Code) / deepseek / anthropic / openai (OpenAI 兼容, 如 Ollama)
   # model: deepseek-chat     # 不填按 provider 默认: deepseek-chat / claude-opus-5
   api_key: ""
   # base_url: http://127.0.0.1:11434/v1   # provider=openai 时用
@@ -37,7 +37,7 @@ libraries:
     type: tv
   - path: /动漫
     type: tv
-    recognize: ai            # 字幕组文件名乱, 全交给 AI
+    recognize: ai
   # - path: /来自分享
   #   type: auto
   #   output: index          # 不往这个目录里写东西

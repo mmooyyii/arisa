@@ -95,7 +95,7 @@ class QuarkTvClient(
             )["data"]?.jsonObject ?: break
             val resp = json.decodeFromJsonElement(ListData.serializer(), data)
             resp.files.mapTo(files) {
-                QuarkFile(it.fid, it.filename, it.isdir == 1, it.size, it.category, it.updatedAt)
+                QuarkFile(it.fid, it.filename, it.isdir == 1, it.size, it.category, it.updatedAt, it.thumbnailUrl?.ifEmpty { null })
             }
             page++
             if (resp.files.isEmpty() || page.toLong() * pageSize >= resp.totalCount) break
@@ -238,6 +238,7 @@ class QuarkTvClient(
         val size: Long = 0,
         val isdir: Int = 0,
         @kotlinx.serialization.SerialName("updated_at") val updatedAt: Long = 0,
+        @kotlinx.serialization.SerialName("thumbnail_url") val thumbnailUrl: String? = null,
     )
 
     @Serializable

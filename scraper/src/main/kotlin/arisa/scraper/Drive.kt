@@ -54,6 +54,8 @@ class QuarkDrive(private val client: QuarkWebClient, rate: RateLimit) : Drive {
         while (true) {
             try {
                 return block()
+            } catch (e: arisa.quark.QuarkAuthException) {
+                throw LoginExpiredException("夸克登录失效, 运行 arisa-scraper login 重新登录 (${e.message})")
             } catch (e: Exception) {
                 if (++attempt >= 3) throw e
                 Thread.sleep(2000L * attempt)

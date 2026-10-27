@@ -27,13 +27,6 @@ enum class ExistingNfo {
 }
 
 @Serializable
-enum class Recognize {
-    @SerialName("rules") RULES,
-    @SerialName("rules+ai") RULES_AI,
-    @SerialName("ai") AI,
-}
-
-@Serializable
 enum class LibraryType {
     @SerialName("movie") MOVIE,
     @SerialName("tv") TV,
@@ -47,7 +40,6 @@ data class LibraryConfig(
     val type: LibraryType = LibraryType.AUTO,
     val output: OutputMode? = null,
     @SerialName("existing_nfo") val existingNfo: ExistingNfo? = null,
-    val recognize: Recognize? = null,
     @SerialName("confidence_threshold") val confidenceThreshold: Double? = null,
     val language: String? = null,
     @SerialName("fallback_language") val fallbackLanguage: String? = null,
@@ -57,8 +49,8 @@ data class LibraryConfig(
 data class Defaults(
     val output: OutputMode = OutputMode.INDEX_NFO,
     @SerialName("existing_nfo") val existingNfo: ExistingNfo = ExistingNfo.TRUST,
-    val recognize: Recognize = Recognize.RULES_AI,
-    @SerialName("confidence_threshold") val confidenceThreshold: Double = 0.85,
+    /** auto 命令自动接受规则匹配的门槛, 低于它的交给 skill. */
+    @SerialName("confidence_threshold") val confidenceThreshold: Double = 0.97,
     val language: String = "zh-CN",
     @SerialName("fallback_language") val fallbackLanguage: String = "en-US",
 )
@@ -67,20 +59,6 @@ data class Defaults(
 data class TmdbConfig(
     @SerialName("api_key") val apiKey: String = "",
     /** 可选代理, 如 http://127.0.0.1:7890 (默认走 api.tmdb.org, 国内能直连) */
-    val proxy: String? = null,
-)
-
-@Serializable
-data class AiConfig(
-    /** anthropic / deepseek / openai (OpenAI 兼容接口, 含 Ollama) / none */
-    val provider: String = "none",
-    /** 不填按 provider 取默认: anthropic=claude-opus-5, deepseek=deepseek-chat */
-    val model: String? = null,
-    /** low / medium / high, 只对 anthropic 生效; 文件名识别用 low 就够. */
-    val effort: String = "low",
-    @SerialName("api_key") val apiKey: String = "",
-    /** openai 兼容接口地址, 如 http://127.0.0.1:11434/v1; deepseek 默认 https://api.deepseek.com */
-    @SerialName("base_url") val baseUrl: String? = null,
     val proxy: String? = null,
 )
 
@@ -94,33 +72,24 @@ data class RateLimit(
 data class ScanConfig(
     /** 分钟, daemon 模式下的扫描间隔. */
     @SerialName("interval_minutes") val intervalMinutes: Int = 30,
+    /** 小时, daemon 定期请求一次夸克, 让登录态 (24 小时有效, 每次请求续期) 不过期. */
+    @SerialName("keepalive_hours") val keepaliveHours: Int = 6,
     /** 保留几个历史索引. */
     @SerialName("keep_indexes") val keepIndexes: Int = 5,
-)
-
-/** 人工修正: 网盘路径 (目录或文件) → TMDB. */
-@Serializable
-data class Override(
-    val path: String,
-    val type: LibraryType,
-    @SerialName("tmdb_id") val tmdbId: Int,
 )
 
 @Serializable
 data class Config(
     val defaults: Defaults = Defaults(),
     val tmdb: TmdbConfig = TmdbConfig(),
-    val ai: AiConfig = AiConfig(),
     @SerialName("rate_limit") val rateLimit: RateLimit = RateLimit(),
     val scan: ScanConfig = ScanConfig(),
     val libraries: List<LibraryConfig> = emptyList(),
-    val overrides: List<Override> = emptyList(),
 ) {
     /** 合并 defaults 和片库自己的覆盖项. */
     fun effective(lib: LibraryConfig) = Effective(
         output = lib.output ?: defaults.output,
         existingNfo = lib.existingNfo ?: defaults.existingNfo,
-        recognize = lib.recognize ?: defaults.recognize,
         confidenceThreshold = lib.confidenceThreshold ?: defaults.confidenceThreshold,
         language = lib.language ?: defaults.language,
         fallbackLanguage = lib.fallbackLanguage ?: defaults.fallbackLanguage,
@@ -129,7 +98,6 @@ data class Config(
     data class Effective(
         val output: OutputMode,
         val existingNfo: ExistingNfo,
-        val recognize: Recognize,
         val confidenceThreshold: Double,
         val language: String,
         val fallbackLanguage: String,
@@ -143,7 +111,6 @@ data class Config(
             val config = if (file.exists()) yaml.decodeFromString(serializer(), file.readText()) else Config()
             return config.copy(
                 tmdb = config.tmdb.copy(apiKey = env["ARISA_TMDB_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.tmdb.apiKey),
-                ai = config.ai.copy(apiKey = env["ARISA_AI_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.ai.apiKey),
             )
         }
     }

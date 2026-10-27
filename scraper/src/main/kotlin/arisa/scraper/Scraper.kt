@@ -11,6 +11,7 @@ import arisa.library.MediaItem
 import arisa.library.MediaType
 import arisa.library.Season
 import arisa.quark.QuarkFile
+import kotlinx.serialization.Serializable
 
 /** 扫描到的一个视频文件. */
 data class ScannedFile(
@@ -27,28 +28,66 @@ data class ScannedFile(
     val mediaFile get() = MediaFile(file.fid, file.name, path, file.size, file.updatedAt)
 }
 
-/** 一个待识别的单位: 一部电影的一个文件, 或者一部剧的所有文件. */
-private data class Work(
+/** 一次扫描的结果. */
+class Scan(val files: List<ScannedFile>, val libraryRoots: Map<String, String>)
+
+/** 规则猜出来的一部作品: 一部电影的一个文件, 或者一个剧集目录下的所有文件. */
+private class Work(
     val kind: MediaType,
     val files: List<ScannedFile>,
     /** 剧集的根目录, 电影为 null. */
     val showDir: QuarkFile?,
-    val showSiblings: List<QuarkFile>,
     val parsed: ParsedName,
 ) {
     val first get() = files.first()
+    /** 做映射时用的 key: 剧集用目录, 电影用文件. */
+    val key get() = showDir?.fid ?: first.file.fid
     val displayPath get() = showDir?.let { first.path.substringBefore("/${it.name}/") + "/${it.name}" } ?: first.path
 }
 
-private data class Match(val tmdbId: Int, val source: String, val confidence: Double)
+/** 待识别的作品, 给 skill 看的. */
+@Serializable
+data class PendingWork(
+    /** 用这个 fid 做 decide; 也可以用 dirs 里任意一级目录的 fid. */
+    val key: String,
+    /** 规则猜的类型: movie / tv */
+    val guess: String,
+    val path: String,
+    val fileCount: Int,
+    val samples: List<String>,
+    /** 从片库往下的各级目录 (名字和 fid), 想把整个目录映射过去时用. */
+    val dirs: List<PendingDir>,
+    val rules: PendingParse,
+    /** 视频旁已有 NFO 里的 ID. */
+    val nfo: String? = null,
+    /** 规则在 TMDB 上搜到的候选, 按得分排序. */
+    val candidates: List<PendingCandidate> = emptyList(),
+)
 
-data class ScanReport(
-    val matched: Int,
-    val unmatched: List<String>,
-    val lowConfidence: List<String>,
+@Serializable
+data class PendingDir(val fid: String, val name: String)
+
+@Serializable
+data class PendingParse(val titles: List<String>, val year: Int? = null, val season: Int? = null, val episode: Int? = null)
+
+@Serializable
+data class PendingCandidate(
+    val target: String,
+    val title: String,
+    val original: String? = null,
+    val year: Int? = null,
+    val score: Double,
+    val overview: String? = null,
+)
+
+data class BuildReport(
+    val items: Int,
+    /** 没有映射的视频 (待识别). */
+    val pending: Int,
     val nfoWritten: Int,
+    /** 索引没变化时不上传, 为 null. */
     val indexFile: String?,
-    val renames: List<RenamePlan> = emptyList(),
+    val renames: List<RenamePlan>,
 )
 
 /**
@@ -75,100 +114,35 @@ data class RenamePlan(
     }
 }
 
+/**
+ * 刮削器的确定性部分: 扫描网盘、按映射表生成索引/NFO、改名.
+ * "这是哪部片" 的判断交给 skill (Claude Code), 结论写进映射表.
+ */
 class Scraper(
     private val config: Config,
     private val drive: Drive,
-    private val tmdb: TmdbApi,
-    private val ai: Ai?,
+    private val tmdb: TmdbApi?,
     private val images: Images?,
     private val log: (String) -> Unit = ::println,
 ) {
-    private val lowConfidence = mutableListOf<String>()
+    // ---------- 扫描 ----------
 
-    /**
-     * @param write false 时只生成索引不写网盘 (dry run)
-     */
-    fun run(write: Boolean = true): Pair<Library, ScanReport> {
-        val previous = runCatching { loadLatestIndex() }.getOrNull()
-        val previousMatch = previous?.let(::indexByFid) ?: emptyMap()
-        log("上次索引: ${previous?.items?.size ?: 0} 部")
-
-        val units = mutableListOf<Work>()
+    fun scan(): Scan {
+        val files = mutableListOf<ScannedFile>()
+        val roots = mutableMapOf<String, String>()
         for (lib in config.libraries) {
             val root = drive.resolve(lib.path)
             if (root == null || !root.isDir) {
                 log("片库目录不存在: ${lib.path}")
                 continue
             }
-            val files = mutableListOf<ScannedFile>()
+            roots[lib.path] = root.fid
+            val before = files.size
             walk(lib, root, lib.path.trimEnd('/'), emptyList(), files)
-            log("${lib.path}: ${files.size} 个视频")
-            units += group(lib, files)
+            log("${lib.path}: ${files.size - before} 个视频")
         }
-
-        // 规则识别不了的批量交给 AI 解析文件名
-        val effective = units.associateWith { config.effective(it.first.library) }
-        val needAiParse = units.filter { u ->
-            val eff = effective.getValue(u)
-            ai?.enabled == true && eff.recognize != Recognize.RULES &&
-                (eff.recognize == Recognize.AI || u.parsed.titles.isEmpty()) &&
-                previousMatch[u.first.file.fid] == null
-        }
-        val aiParsed = aiParse(needAiParse)
-
-        val matches = mutableMapOf<Work, Match?>()
-        for (u in units) {
-            val eff = effective.getValue(u)
-            matches[u] = try {
-                match(u, eff, previousMatch, aiParsed[u])
-            } catch (e: TmdbAuthException) {
-                throw e
-            } catch (e: Exception) {
-                log("识别失败 ${u.displayPath}: ${e.message}")
-                null
-            }
-        }
-
-        val (items, unmatched) = build(units, matches, effective)
-        val library = Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched)
-        log("识别 ${items.size} 部, 未识别 ${unmatched.size} 个文件")
-
-        val renames = planRenames(units, matches, items, effective)
-
-        var nfoWritten = 0
-        var indexName: String? = null
-        if (write) {
-            nfoWritten = writeNfos(units, matches, items, effective)
-            indexName = writeIndex(library)
-        }
-        return library to ScanReport(items.size, unmatched.map { it.path }, lowConfidence.toList(), nfoWritten, indexName, renames)
+        return Scan(files, roots)
     }
-
-    /** 按计划文件改名. 执行前核对 fid 和原名, 网盘里已经变了的跳过. 返回 (成功, 跳过的原因). */
-    fun applyRenames(plans: List<RenamePlan>): Pair<Int, List<String>> {
-        var done = 0
-        val skipped = mutableListOf<String>()
-        for ((parentFid, group) in plans.filter { it.skipped == null }.groupBy { it.parentFid }) {
-            val siblings = drive.list(parentFid)
-            for (p in group) {
-                val current = siblings.firstOrNull { it.fid == p.fid }
-                when {
-                    current == null -> skipped += "${p.parentPath}/${p.from}: 已不存在"
-                    current.name == p.to -> {}
-                    current.name != p.from -> skipped += "${p.parentPath}/${p.from}: 名字已变成 ${current.name}"
-                    siblings.any { it.fid != p.fid && it.name == p.to } -> skipped += "${p.parentPath}/${p.from}: 已有同名 ${p.to}"
-                    else -> {
-                        drive.rename(p.fid, p.to)
-                        log("改名 ${p.parentPath}/${p.from} → ${p.to}")
-                        done++
-                    }
-                }
-            }
-        }
-        return done to skipped
-    }
-
-    // ---------- 扫描 ----------
 
     private fun walk(lib: LibraryConfig, dir: QuarkFile, path: String, dirs: List<QuarkFile>, out: MutableList<ScannedFile>) {
         val children = drive.list(dir.fid)
@@ -182,10 +156,64 @@ class Scraper(
         }
     }
 
+    // ---------- 待识别 ----------
+
+    /** 没有映射的视频, 按规则分成作品. [withCandidates] 时顺带查 TMDB 给出候选. */
+    fun pending(scan: Scan, mapping: Mapping, withCandidates: Boolean): List<PendingWork> {
+        val unresolved = scan.files.filter { mapping.resolve(it) == null }
+        return unresolved.groupBy { it.library }.flatMap { (lib, files) -> group(lib, files) }.map { w ->
+            val candidates = if (withCandidates && tmdb != null && w.parsed.titles.isNotEmpty()) {
+                runCatching { candidates(w.kind, w.parsed, config.defaults.language) }
+                    .onFailure { if (it is TmdbAuthException) throw it }
+                    .getOrDefault(emptyList())
+            } else emptyList()
+            PendingWork(
+                key = w.key,
+                guess = if (w.kind == MediaType.MOVIE) "movie" else "tv",
+                path = w.displayPath,
+                fileCount = w.files.size,
+                samples = w.files.map { it.path.removePrefix(w.displayPath).trimStart('/').ifEmpty { it.file.name } }.distinct().take(8),
+                dirs = w.first.dirs.map { PendingDir(it.fid, it.name) },
+                rules = PendingParse(w.parsed.titles, w.parsed.year, w.parsed.season, w.parsed.episode),
+                nfo = nfoTarget(w),
+                candidates = candidates,
+            )
+        }
+    }
+
+    /**
+     * 只自动接受确定的: 视频旁已有 NFO 的, 以及 TMDB 上只有一个候选、片名年份完全对上的.
+     * 其余留给 skill. 返回新增的映射数.
+     */
+    fun autoDecide(scan: Scan, store: MappingStore): Int {
+        var mapping = store.load()
+        val before = mapping.entries.size
+        val unresolved = scan.files.filter { mapping.resolve(it) == null }
+        for ((lib, files) in unresolved.groupBy { it.library }) {
+            for (w in group(lib, files)) {
+                val eff = config.effective(lib)
+                val nfo = if (eff.existingNfo == ExistingNfo.TRUST || eff.existingNfo == ExistingNfo.MERGE) nfoTarget(w) else null
+                if (nfo != null) {
+                    mapping = mapping.with(w.key, MappingEntry(nfo, w.displayPath, by = "nfo"))
+                    continue
+                }
+                if (tmdb == null || w.parsed.titles.isEmpty()) continue
+                val c = runCatching { candidates(w.kind, w.parsed, eff.language) }
+                    .onFailure { if (it is TmdbAuthException) throw it }
+                    .getOrDefault(emptyList())
+                if (c.size == 1 && c[0].score >= eff.confidenceThreshold.coerceAtLeast(0.97)) {
+                    mapping = mapping.with(w.key, MappingEntry(c[0].target, w.displayPath, by = "rules"))
+                }
+            }
+        }
+        store.save(mapping)
+        return mapping.entries.size - before
+    }
+
     private fun group(lib: LibraryConfig, files: List<ScannedFile>): List<Work> {
-        val units = mutableListOf<Work>()
+        val works = mutableListOf<Work>()
         val tvGroups = LinkedHashMap<String, MutableList<Pair<ScannedFile, ParsedName>>>()
-        val showDirs = mutableMapOf<String, Pair<QuarkFile?, List<QuarkFile>>>()
+        val showDirs = mutableMapOf<String, QuarkFile?>()
 
         for (f in files) {
             val p = FilenameParser.parse(f.file.name, f.parentNames)
@@ -195,7 +223,7 @@ class Scraper(
                 LibraryType.AUTO -> p.isEpisode
             }
             if (!isTv) {
-                units += Work(MediaType.MOVIE, listOf(f), null, emptyList(), p)
+                works += Work(MediaType.MOVIE, listOf(f), null, p)
                 continue
             }
             // 剧集根目录: tv 片库取第一层目录; auto 取最近的非季、非画质/版本目录
@@ -205,118 +233,46 @@ class Scraper(
             }
             val key = showDir?.fid ?: "title:${p.titles.firstOrNull()?.lowercase() ?: f.file.fid}"
             tvGroups.getOrPut(key) { mutableListOf() } += f to p
-            if (key !in showDirs) {
-                val siblings = showDir?.let { sd ->
-                    // 剧集根目录下的文件 (tvshow.nfo 在这里); 根目录就是视频所在目录时直接复用
-                    if (f.dirs.lastOrNull()?.fid == sd.fid) f.siblings else drive.list(sd.fid)
-                } ?: emptyList()
-                showDirs[key] = showDir to siblings
-            }
+            showDirs.putIfAbsent(key, showDir)
         }
         for ((key, list) in tvGroups) {
-            val (showDir, siblings) = showDirs.getValue(key)
+            val showDir = showDirs[key]
             // 剧名以目录名为准, 没有目录时用文件名里最常见的片名
             val dirParsed = showDir?.let { FilenameParser.parseText(it.name) }
             val titles = dirParsed?.titles?.takeIf { it.isNotEmpty() }
                 ?: list.groupingBy { it.second.titles }.eachCount().maxByOrNull { it.value }?.key
                 ?: emptyList()
             val year = dirParsed?.year ?: list.firstNotNullOfOrNull { it.second.year }
-            units += Work(MediaType.TV, list.map { it.first }, showDir, siblings, ParsedName(titles, year))
+            works += Work(MediaType.TV, list.map { it.first }, showDir, ParsedName(titles, year))
         }
-        return units
+        return works
     }
 
-    // ---------- 识别 ----------
-
-    private fun aiParse(units: List<Work>): Map<Work, ParsedName> {
-        val ai = ai ?: return emptyMap()
-        if (units.isEmpty()) return emptyMap()
-        log("AI 解析 ${units.size} 个文件名")
-        val result = mutableMapOf<Work, ParsedName>()
-        units.chunked(40).forEach { chunk ->
-            val parsed = runCatching { ai.parse(chunk.map { it.displayPath }) }
-                .onFailure { log("AI 解析失败: ${it.message}") }
-                .getOrDefault(emptyList())
-            for (p in parsed) {
-                val u = chunk.getOrNull(p.index) ?: continue
-                val titles = listOfNotNull(p.titleZh, p.titleEn).filter { it.isNotBlank() }.distinct()
-                if (titles.isNotEmpty()) result[u] = ParsedName(titles, p.year ?: u.parsed.year)
+    /** 视频旁已有的 NFO 里记录的作品, 如 "movie:438631". */
+    private fun nfoTarget(w: Work): String? {
+        val nfoFile = when (w.kind) {
+            MediaType.TV -> {
+                val dir = w.showDir ?: return null
+                val siblings = if (w.first.dirs.lastOrNull()?.fid == dir.fid) w.first.siblings else drive.list(dir.fid)
+                siblings.firstOrNull { it.name.equals("tvshow.nfo", true) }
             }
-        }
-        return result
-    }
-
-    private fun match(u: Work, eff: Config.Effective, previous: Map<String, Pair<MediaType, Int>>, aiParsed: ParsedName?): Match? {
-        // 1. 人工修正
-        overrideFor(u)?.let { return it }
-
-        // 2. 已有 NFO
-        if (eff.existingNfo == ExistingNfo.TRUST || eff.existingNfo == ExistingNfo.MERGE) {
-            nfoMatch(u)?.let { return it }
-        }
-
-        // 3. 上次已识别过的文件, 沿用
-        u.files.firstNotNullOfOrNull { previous[it.file.fid] }?.let { (type, id) ->
-            if (type == u.kind) return Match(id, "previous", 1.0)
-        }
-
-        // 4. 规则 / AI 解析出片名后搜 TMDB
-        val parsed = aiParsed ?: u.parsed
-        if (parsed.titles.isEmpty()) return null
-        val candidates = search(u.kind, parsed, eff.language)
-        if (candidates.isEmpty()) return null
-
-        val ruleChoice = ruleChoose(parsed, candidates)
-        if (ruleChoice != null && ruleChoice.confidence >= eff.confidenceThreshold) return ruleChoice
-
-        val ai = ai
-        if (ai != null && ai.enabled && eff.recognize != Recognize.RULES) {
-            val choice = runCatching {
-                ai.choose(u.displayPath, if (u.kind == MediaType.TV) "剧集" else "电影", candidates.take(8).map {
-                    Candidate(it.id, it.displayTitle, it.displayOriginal, it.year, it.overview)
-                })
-            }.onFailure { log("AI 选择失败: ${it.message}") }.getOrNull()
-            if (choice?.tmdbId != null) {
-                if (choice.confidence < eff.confidenceThreshold) lowConfidence += "${u.displayPath} → ${choice.tmdbId} (${choice.confidence})"
-                return Match(choice.tmdbId, "ai", choice.confidence)
-            }
-        }
-        if (ruleChoice != null) {
-            lowConfidence += "${u.displayPath} → ${ruleChoice.tmdbId} (${"%.2f".format(ruleChoice.confidence)})"
-            return ruleChoice
-        }
-        return null
-    }
-
-    private fun overrideFor(u: Work): Match? {
-        val path = u.displayPath
-        val o = config.overrides
-            .filter { path == it.path.trimEnd('/') || path.startsWith(it.path.trimEnd('/') + "/") }
-            .maxByOrNull { it.path.length } ?: return null
-        val type = if (o.type == LibraryType.TV) MediaType.TV else MediaType.MOVIE
-        return if (type == u.kind) Match(o.tmdbId, "manual", 1.0) else null
-    }
-
-    private fun nfoMatch(u: Work): Match? {
-        val nfoFile = when (u.kind) {
-            MediaType.TV -> u.showSiblings.firstOrNull { it.name.equals("tvshow.nfo", true) }
             MediaType.MOVIE -> {
-                val base = u.first.file.name.substringBeforeLast('.')
-                u.first.siblings.firstOrNull { it.name.equals("$base.nfo", true) }
-                    ?: u.first.siblings.firstOrNull { it.name.equals("movie.nfo", true) }
+                val base = w.first.file.name.substringBeforeLast('.')
+                w.first.siblings.firstOrNull { it.name.equals("$base.nfo", true) }
+                    ?: w.first.siblings.firstOrNull { it.name.equals("movie.nfo", true) }
             }
         } ?: return null
         val ids = runCatching { Nfo.read(drive.download(nfoFile.fid).decodeToString()) }.getOrNull() ?: return null
-        ids.tmdbId?.let { return Match(it, "nfo", 1.0) }
-        ids.imdbId?.let { imdb ->
-            val found = runCatching { tmdb.findByImdb(imdb) }.getOrNull() ?: return null
-            val kind = if (found.first == Tmdb.MediaKind.TV) MediaType.TV else MediaType.MOVIE
-            if (kind == u.kind) return Match(found.second, "nfo", 1.0)
-        }
-        return null
+        val kind = if (ids.root == "movie") "movie" else "tv"
+        ids.tmdbId?.let { return "$kind:$it" }
+        val imdb = ids.imdbId ?: return null
+        val found = runCatching { tmdb?.findByImdb(imdb) }.getOrNull() ?: return null
+        return "${if (found.first == Tmdb.MediaKind.TV) "tv" else "movie"}:${found.second}"
     }
 
-    private fun search(kind: MediaType, parsed: ParsedName, language: String): List<Tmdb.SearchResult> {
+    /** 用规则解析出的片名搜 TMDB, 打分排序. */
+    private fun candidates(kind: MediaType, parsed: ParsedName, language: String): List<PendingCandidate> {
+        val tmdb = tmdb ?: return emptyList()
         val seen = LinkedHashMap<Int, Tmdb.SearchResult>()
         for (title in parsed.titles) {
             val years = if (parsed.year != null) listOf(parsed.year, null) else listOf(null)
@@ -329,85 +285,87 @@ class Scraper(
                 if (results.isNotEmpty()) break
             }
         }
-        return seen.values.toList()
-    }
-
-    /** 规则判断: 片名完全一致且年份对得上才算高置信度. */
-    private fun ruleChoose(parsed: ParsedName, candidates: List<Tmdb.SearchResult>): Match? {
         val queries = parsed.titles.map(::normalize).toSet()
         val year = parsed.year
-        val scored = candidates.map { c ->
+        val prefix = if (kind == MediaType.MOVIE) "movie" else "tv"
+        return seen.values.map { c ->
             val cYear = c.year
-            val names = listOfNotNull(c.displayTitle, c.displayOriginal).map(::normalize)
-            val exact = names.any { it in queries }
-            val yearOk = year == null || cYear == null || cYear == year
-            val yearNear = year != null && cYear != null && kotlin.math.abs(cYear - year) <= 1
+            val exact = listOfNotNull(c.displayTitle, c.displayOriginal).map(::normalize).any { it in queries }
             val score = when {
                 exact && year != null && cYear == year -> 0.97
-                exact && yearNear -> 0.9
-                exact && yearOk -> 0.8
+                exact && year != null && cYear != null && kotlin.math.abs(cYear - year) <= 1 -> 0.9
+                exact && (year == null || cYear == null) -> 0.8
                 exact -> 0.5
-                yearOk -> 0.4
+                year == null || cYear == null || cYear == year -> 0.4
                 else -> 0.2
             }
-            c to score
-        }
-        val ranked = scored.sortedWith(compareByDescending<Pair<Tmdb.SearchResult, Double>> { it.second }.thenByDescending { it.first.popularity })
-        val (best, score) = ranked.first()
-        // 同分的不止一个 (同名作品) 时降低置信度
-        val tie = ranked.count { it.second == score } > 1
-        val confidence = if (tie && year == null) score - 0.2 else score
-        return Match(best.id, "rules", confidence)
+            PendingCandidate("$prefix:${c.id}", c.displayTitle, c.displayOriginal?.takeIf { it != c.displayTitle }, cYear, score, c.overview?.take(80))
+        }.sortedByDescending { it.score }.take(6)
     }
 
     private fun normalize(s: String) = s.lowercase().replace(Regex("[\\s\\p{Punct}·：:，,。！!？?'’\"“”]"), "")
 
-    // ---------- 生成条目 ----------
+    // ---------- 生成索引 ----------
 
-    private fun build(
-        units: List<Work>,
-        matches: Map<Work, Match?>,
-        effective: Map<Work, Config.Effective>,
-    ): Pair<List<MediaItem>, List<MediaFile>> {
+    /**
+     * 按映射表生成索引: 每个文件找到它的映射, 同一作品的文件合并成一个条目.
+     * TMDB 和图片都有磁盘缓存, 只有新作品才真正发请求; 索引内容没变就不上传.
+     */
+    fun build(scan: Scan, mapping: Mapping, write: Boolean = true): Pair<Library, BuildReport> {
+        val tmdb = tmdb ?: error("生成索引需要 TMDB")
+        val byTarget = LinkedHashMap<String, MutableList<Pair<ScannedFile, MappingEntry>>>()
         val unmatched = mutableListOf<MediaFile>()
-        // 同一部作品可能分散在多个单位 (多个版本、多个季目录), 按 TMDB ID 合并
-        val byId = LinkedHashMap<Pair<MediaType, Int>, MutableList<Work>>()
-        for (u in units) {
-            val m = matches[u]
-            if (m == null) {
-                u.files.mapTo(unmatched) { it.mediaFile }
-            } else {
-                byId.getOrPut(u.kind to m.tmdbId) { mutableListOf() } += u
-            }
+        for (f in scan.files) {
+            val (_, entry) = mapping.resolve(f) ?: run { unmatched += f.mediaFile; null } ?: continue
+            if (entry.isSkip) continue
+            byTarget.getOrPut(entry.target) { mutableListOf() } += f to entry
         }
+
         val items = mutableListOf<MediaItem>()
-        for ((key, group) in byId) {
-            val (kind, id) = key
-            val eff = effective.getValue(group.first())
-            val match = group.mapNotNull { matches[it] }.minBy { it.confidence }
+        for ((target, list) in byTarget) {
+            val (kind, id) = list.first().second.tmdb()!!
+            val eff = config.effective(list.first().first.library)
+            val source = list.map { it.second.by }.distinct().joinToString("+")
             try {
-                items += when (kind) {
-                    MediaType.MOVIE -> buildMovie(id, group, eff, match)
-                    MediaType.TV -> buildTv(id, group, eff, match)
-                }
+                items += if (kind == "movie") buildMovie(tmdb, id, list.map { it.first }, eff, source)
+                else buildTv(tmdb, id, list, eff, source)
+            } catch (e: TmdbAuthException) {
+                throw e
             } catch (e: Exception) {
-                log("获取详情失败 $kind $id: ${e.message}")
-                group.flatMap { it.files }.mapTo(unmatched) { it.mediaFile }
+                log("获取详情失败 $target: ${e.message}")
+                list.mapTo(unmatched) { it.first.mediaFile }
             }
         }
         items.sortByDescending { it.addedAt }
-        return items to unmatched
+
+        val previous = runCatching { loadLatestIndex() }.getOrNull()
+        val library = Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched)
+        log("${items.size} 部作品, ${unmatched.size} 个视频待识别")
+
+        val renames = planRenames(scan, mapping, items)
+        var nfoWritten = 0
+        var indexName: String? = null
+        if (write) {
+            nfoWritten = writeNfos(scan, mapping, items)
+            // 内容没变 (只有生成时间不同) 就不传新索引, 避免每次定时任务都写网盘
+            if (previous == null || previous.copy(generatedAt = 0) != library.copy(generatedAt = 0)) {
+                indexName = writeIndex(library)
+            } else {
+                log("索引没有变化")
+            }
+        }
+        return library to BuildReport(items.size, unmatched.size, nfoWritten, indexName, renames)
     }
 
-    private fun details(kind: MediaType, id: Int, eff: Config.Effective): Tmdb.Details {
-        val d = if (kind == MediaType.MOVIE) tmdb.movie(id, eff.language) else tmdb.tv(id, eff.language)
+    private fun details(tmdb: TmdbApi, kind: String, id: Int, eff: Config.Effective): Tmdb.Details {
+        val d = if (kind == "movie") tmdb.movie(id, eff.language) else tmdb.tv(id, eff.language)
         if (!d.overview.isNullOrBlank() || eff.fallbackLanguage == eff.language) return d
         // 主语言没有简介时用回退语言补
-        val fb = if (kind == MediaType.MOVIE) tmdb.movie(id, eff.fallbackLanguage) else tmdb.tv(id, eff.fallbackLanguage)
+        val fb = if (kind == "movie") tmdb.movie(id, eff.fallbackLanguage) else tmdb.tv(id, eff.fallbackLanguage)
         return d.copy(overview = fb.overview)
     }
 
-    private fun base(kind: MediaType, d: Tmdb.Details, eff: Config.Effective, match: Match, files: List<ScannedFile>): MediaItem {
+    private fun base(kind: MediaType, d: Tmdb.Details, eff: Config.Effective, source: String, files: List<ScannedFile>): MediaItem {
         val lang = eff.language.substringBefore('-')
         val logo = d.images?.logos.orEmpty().let { logos ->
             logos.filter { it.language == lang }.maxByOrNull { it.voteAverage }
@@ -451,23 +409,21 @@ class Scraper(
             ),
             cast = d.credits?.cast.orEmpty().take(15).map { CastMember(it.name, it.character?.takeIf(String::isNotBlank), it.profilePath) },
             addedAt = files.minOf { it.file.updatedAt },
-            match = MatchInfo(match.source, match.confidence),
+            match = MatchInfo(source, 1.0),
         )
     }
 
-    private fun buildMovie(id: Int, group: List<Work>, eff: Config.Effective, match: Match): MediaItem {
-        val files = group.flatMap { it.files }
-        val d = details(MediaType.MOVIE, id, eff)
-        return base(MediaType.MOVIE, d, eff, match, files).copy(files = files.map { it.mediaFile })
+    private fun buildMovie(tmdb: TmdbApi, id: Int, files: List<ScannedFile>, eff: Config.Effective, source: String): MediaItem {
+        val d = details(tmdb, "movie", id, eff)
+        return base(MediaType.MOVIE, d, eff, source, files).copy(files = files.map { it.mediaFile })
     }
 
-    private fun buildTv(id: Int, group: List<Work>, eff: Config.Effective, match: Match): MediaItem {
-        val files = group.flatMap { it.files }
-        val d = details(MediaType.TV, id, eff)
-        // 每个文件的季/集
-        val located = files.map { f ->
+    private fun buildTv(tmdb: TmdbApi, id: Int, list: List<Pair<ScannedFile, MappingEntry>>, eff: Config.Effective, source: String): MediaItem {
+        val d = details(tmdb, "tv", id, eff)
+        // 每个文件的季/集; 映射里指定了季号的以映射为准
+        val located = list.map { (f, entry) ->
             val p = FilenameParser.parse(f.file.name, f.parentNames)
-            Triple(f, p.season ?: 1, p.episode)
+            Triple(f, entry.season ?: p.season ?: 1, p.episode)
         }
         // 有的资源按绝对集数编号 (第二季目录里是 26~50 集), 换算成季内集数
         val seasonCounts = d.seasons.filter { it.seasonNumber > 0 }.associate { it.seasonNumber to it.episodeCount }
@@ -477,10 +433,10 @@ class Scraper(
             val offset = (1 until season).sumOf { seasonCounts[it] ?: 0 }
             return if (ep - offset in 1..count) ep - offset else ep
         }
-        val seasons = located.map { (f, s, e) -> Triple(f, s, relative(s, e)) }.groupBy { it.second }.toSortedMap().map { (number, list) ->
+        val seasons = located.map { (f, s, e) -> Triple(f, s, relative(s, e)) }.groupBy { it.second }.toSortedMap().map { (number, files) ->
             val sd = runCatching { tmdb.season(id, number, eff.language) }.getOrNull()
             val known = sd?.episodes.orEmpty().associateBy { it.episodeNumber }
-            val episodes = list.groupBy { it.third }.map { (ep, fs) ->
+            val episodes = files.groupBy { it.third }.map { (ep, fs) ->
                 val e = ep?.let { known[it] }
                 Episode(
                     season = number,
@@ -496,38 +452,34 @@ class Scraper(
             val summary = d.seasons.firstOrNull { it.seasonNumber == number }
             Season(number, sd?.name ?: summary?.name, sd?.overview?.takeIf { it.isNotBlank() }, sd?.posterPath ?: summary?.posterPath, episodes)
         }
-        return base(MediaType.TV, d, eff, match, files).copy(seasons = seasons)
+        return base(MediaType.TV, d, eff, source, list.map { it.first }).copy(seasons = seasons)
     }
 
     // ---------- 改名 ----------
 
     /**
      * 只改作品所在的顶层目录; 顶层目录里有多部作品时当合集, 改下一层每部的目录.
-     * 置信度不够、目录里有没识别的文件、改完会重名的, 都只记录不改.
+     * 目录里有还没识别的文件、改完会重名的, 都只记录不改.
      */
-    private fun planRenames(
-        units: List<Work>,
-        matches: Map<Work, Match?>,
-        items: List<MediaItem>,
-        effective: Map<Work, Config.Effective>,
-    ): List<RenamePlan> {
+    private fun planRenames(scan: Scan, mapping: Mapping, items: List<MediaItem>): List<RenamePlan> {
         val itemById = items.associateBy { it.id }
-        // 每个文件对应的作品, 没识别或置信度不够的为 null
-        val entries = units.flatMap { u ->
-            val m = matches[u]
-            val id = m?.takeIf { it.confidence >= effective.getValue(u).confidenceThreshold }
-                ?.let { "${if (u.kind == MediaType.MOVIE) "movie" else "tv"}:${it.tmdbId}" }
-            u.files.map { it to id }
-        }.filter { (f, _) -> f.dirs.isNotEmpty() }
+        // 每个文件对应的作品, 没识别的为 null, skip 的不参与
+        val entries = scan.files.mapNotNull { f ->
+            val entry = mapping.resolve(f)?.second
+            when {
+                f.dirs.isEmpty() -> null
+                entry == null -> f to null
+                entry.isSkip -> null
+                else -> f to entry.target
+            }
+        }
 
         val plans = mutableListOf<RenamePlan>()
-        val rootFids = mutableMapOf<String, String>()
         fun plan(dir: QuarkFile, parentFid: String, parentPath: String, ids: Set<String?>) {
             val item = ids.singleOrNull()?.let { itemById[it] }
             val skip = when {
-                null in ids && ids.size > 1 -> "部分文件没识别出来"
-                null in ids -> "没识别出来"
-                item == null -> "没识别出来"
+                null in ids && ids.size > 1 -> "部分文件还没识别"
+                item == null -> "还没识别"
                 else -> null
             }
             val to = item?.let { targetName(it) } ?: ""
@@ -537,10 +489,9 @@ class Scraper(
 
         entries.groupBy { (f, _) -> f.library.path.trimEnd('/') to f.dirs[0] }.forEach { (key, list) ->
             val (libPath, top) = key
-            val rootFid = rootFids.getOrPut(libPath) { drive.resolve(libPath)!!.fid }
+            val rootFid = scan.libraryRoots[libPath] ?: scan.libraryRoots.getValue("$libPath/")
             val ids = list.map { it.second }.toSet()
-            val known = ids.filterNotNull()
-            if (known.size <= 1) {
+            if (ids.filterNotNull().size <= 1) {
                 plan(top, rootFid, libPath, ids)
             } else {
                 // 合集: 保留合集目录, 改下一层
@@ -564,6 +515,30 @@ class Scraper(
         }
     }
 
+    /** 按计划文件改名. 执行前核对 fid 和原名, 网盘里已经变了的跳过. 返回 (成功, 跳过的原因). */
+    fun applyRenames(plans: List<RenamePlan>): Pair<Int, List<String>> {
+        var done = 0
+        val skipped = mutableListOf<String>()
+        for ((parentFid, group) in plans.filter { it.skipped == null }.groupBy { it.parentFid }) {
+            val siblings = drive.list(parentFid)
+            for (p in group) {
+                val current = siblings.firstOrNull { it.fid == p.fid }
+                when {
+                    current == null -> skipped += "${p.parentPath}/${p.from}: 已不存在"
+                    current.name == p.to -> {}
+                    current.name != p.from -> skipped += "${p.parentPath}/${p.from}: 名字已变成 ${current.name}"
+                    siblings.any { it.fid != p.fid && it.name == p.to } -> skipped += "${p.parentPath}/${p.from}: 已有同名 ${p.to}"
+                    else -> {
+                        drive.rename(p.fid, p.to)
+                        log("改名 ${p.parentPath}/${p.from} → ${p.to}")
+                        done++
+                    }
+                }
+            }
+        }
+        return done to skipped
+    }
+
     /** "片名 (年份)", 去掉网盘不允许的字符. */
     private fun targetName(item: MediaItem): String {
         val title = item.title.replace('/', '／').replace('\\', '＼').replace(':', '：').replace(Regex("[*?\"<>|]"), "").trim()
@@ -572,29 +547,27 @@ class Scraper(
 
     // ---------- 写网盘 ----------
 
-    private fun writeNfos(
-        units: List<Work>,
-        matches: Map<Work, Match?>,
-        items: List<MediaItem>,
-        effective: Map<Work, Config.Effective>,
-    ): Int {
+    /**
+     * NFO 写在映射所在的位置: 电影写在每个视频旁边; 剧集的 tvshow.nfo 写在映射的目录里.
+     * 已经存在的不覆盖 (除非 existing_nfo: overwrite), 所以增量运行时只会写新作品的.
+     */
+    private fun writeNfos(scan: Scan, mapping: Mapping, items: List<MediaItem>): Int {
         val itemById = items.associateBy { it.id }
         var written = 0
-        for (u in units) {
-            val eff = effective.getValue(u)
+        val doneDirs = mutableSetOf<String>()
+        for (f in scan.files) {
+            val (keyFid, entry) = mapping.resolve(f) ?: continue
+            if (entry.isSkip || entry.by == "nfo") continue
+            val eff = config.effective(f.library)
             if (eff.output == OutputMode.INDEX) continue
-            val m = matches[u] ?: continue
-            // NFO 本来就是读来的, 除非要求覆盖, 不再回写
-            if (m.source == "nfo" && eff.existingNfo != ExistingNfo.OVERWRITE) continue
-            val item = itemById["${if (u.kind == MediaType.MOVIE) "movie" else "tv"}:${m.tmdbId}"] ?: continue
+            val item = itemById[entry.target] ?: continue
+            val overwrite = eff.existingNfo == ExistingNfo.OVERWRITE
             val full = eff.output == OutputMode.INDEX_FULL
-            val overwrite = eff.existingNfo == ExistingNfo.OVERWRITE || m.source == "manual"
             try {
-                when (u.kind) {
+                when (item.type) {
                     MediaType.MOVIE -> {
-                        val f = u.first
                         val base = f.file.name.substringBeforeLast('.')
-                        val parent = f.dirs.lastOrNull()?.fid ?: libraryRootFid(f.library)
+                        val parent = f.dirs.lastOrNull()?.fid ?: scan.libraryRoots.getValue(f.library.path)
                         if (put(parent, f.siblings, "$base.nfo", Nfo.movie(item).toByteArray(), overwrite)) written++
                         if (full) {
                             putImage(parent, f.siblings, "$base-poster.jpg", item.poster)
@@ -603,40 +576,34 @@ class Scraper(
                         }
                     }
                     MediaType.TV -> {
-                        val dir = u.showDir ?: continue
-                        if (put(dir.fid, u.showSiblings, "tvshow.nfo", Nfo.tvShow(item).toByteArray(), overwrite)) written++
-                        if (full) {
-                            putImage(dir.fid, u.showSiblings, "poster.jpg", item.poster)
-                            putImage(dir.fid, u.showSiblings, "fanart.jpg", item.backdrop)
-                            putImage(dir.fid, u.showSiblings, "clearlogo.png", item.logo)
-                            item.seasons.forEach { s ->
-                                putImage(dir.fid, u.showSiblings, "season%02d-poster.jpg".format(s.number), s.poster)
+                        // 映射在目录上时, tvshow.nfo 写在那个目录
+                        val showDir = f.dirs.firstOrNull { it.fid == keyFid }
+                        if (showDir != null && doneDirs.add(showDir.fid)) {
+                            val siblings = drive.list(showDir.fid)
+                            if (put(showDir.fid, siblings, "tvshow.nfo", Nfo.tvShow(item).toByteArray(), overwrite)) written++
+                            if (full) {
+                                putImage(showDir.fid, siblings, "poster.jpg", item.poster)
+                                putImage(showDir.fid, siblings, "fanart.jpg", item.backdrop)
+                                putImage(showDir.fid, siblings, "clearlogo.png", item.logo)
                             }
-                            written += writeEpisodeNfos(u, item, overwrite)
+                        }
+                        if (full) {
+                            val ep = item.seasons.flatMap { it.episodes }.firstOrNull { e -> e.files.any { it.fid == f.file.fid } }
+                            val parent = f.dirs.lastOrNull()?.fid
+                            if (ep != null && parent != null) {
+                                val base = f.file.name.substringBeforeLast('.')
+                                if (put(parent, f.siblings, "$base.nfo", Nfo.episode(item, ep).toByteArray(), overwrite)) written++
+                                putImage(parent, f.siblings, "$base-thumb.jpg", ep.still)
+                            }
                         }
                     }
                 }
             } catch (e: Exception) {
-                log("写 NFO 失败 ${u.displayPath}: ${e.message}")
+                log("写 NFO 失败 ${f.path}: ${e.message}")
             }
         }
         return written
     }
-
-    private fun writeEpisodeNfos(u: Work, item: MediaItem, overwrite: Boolean): Int {
-        var written = 0
-        val byFid = item.seasons.flatMap { s -> s.episodes.flatMap { e -> e.files.map { it.fid to e } } }.toMap()
-        for (f in u.files) {
-            val ep = byFid[f.file.fid] ?: continue
-            val parent = f.dirs.lastOrNull()?.fid ?: continue
-            val base = f.file.name.substringBeforeLast('.')
-            if (put(parent, f.siblings, "$base.nfo", Nfo.episode(item, ep).toByteArray(), overwrite)) written++
-            putImage(parent, f.siblings, "$base-thumb.jpg", ep.still)
-        }
-        return written
-    }
-
-    private fun libraryRootFid(lib: LibraryConfig) = drive.resolve(lib.path)!!.fid
 
     /** 写文件; 已存在时默认跳过, overwrite 时先删再传 (夸克不覆盖同名文件). */
     private fun put(parentFid: String, siblings: List<QuarkFile>, name: String, bytes: ByteArray, overwrite: Boolean): Boolean {
@@ -687,16 +654,5 @@ class Scraper(
             "Soap" to "肥皂剧",
             "Talk" to "脱口秀",
         )
-    }
-
-    private fun indexByFid(lib: Library): Map<String, Pair<MediaType, Int>> {
-        val map = mutableMapOf<String, Pair<MediaType, Int>>()
-        for (item in lib.items) {
-            val id = item.tmdbId ?: continue
-            if (item.match.source == "manual") continue
-            item.files.forEach { map[it.fid] = item.type to id }
-            item.seasons.forEach { s -> s.episodes.forEach { e -> e.files.forEach { map[it.fid] = item.type to id } } }
-        }
-        return map
     }
 }

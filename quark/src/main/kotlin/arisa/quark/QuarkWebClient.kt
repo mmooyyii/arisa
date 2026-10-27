@@ -53,7 +53,7 @@ class QuarkWebClient(
             ))
             val resp = json.decodeFromJsonElement(SortResp.serializer(), obj)
             resp.data.list.mapTo(files) {
-                QuarkFile(it.fid, unescapeHtml(it.fileName), !it.file, it.size, it.category, it.updatedAt)
+                QuarkFile(it.fid, unescapeHtml(it.fileName), !it.file, it.size, it.category, it.updatedAt, it.thumbnail?.ifEmpty { null })
             }
             if (resp.data.list.isEmpty() || page * size >= resp.metadata.total) break
             page++
@@ -256,7 +256,11 @@ class QuarkWebClient(
             .getOrElse { throw QuarkException("$path: bad response: ${text.take(200)}") }
         val status = obj.intField("status")
         val code = obj.intField("code")
-        if (status >= 400 || code != 0) throw QuarkException("$path: status=$status code=$code ${obj.stringField("message")}")
+        val message = obj.stringField("message")
+        if (status == 401 || "login" in message.lowercase() || "登录" in message) {
+            throw QuarkAuthException("$path: 登录失效 status=$status code=$code $message")
+        }
+        if (status >= 400 || code != 0) throw QuarkException("$path: status=$status code=$code $message")
         return obj
     }
 
@@ -309,6 +313,7 @@ class QuarkWebClient(
         val size: Long = 0,
         val file: Boolean = true,
         @SerialName("updated_at") val updatedAt: Long = 0,
+        val thumbnail: String? = null,
     )
 
     @Serializable

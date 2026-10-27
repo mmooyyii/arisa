@@ -19,11 +19,25 @@ data class Library(
     val items: List<MediaItem> = emptyList(),
     /** 没识别出来的视频, TV 上放在"未识别"里, 仍然能播. */
     val unmatched: List<MediaFile> = emptyList(),
+    /** 合集: 同一个顶层目录里的多部作品, TV 首页合成一张卡片. */
+    val collections: List<MediaCollection> = emptyList(),
 ) {
     companion object {
         const val SCHEMA = 1
     }
 }
+
+/** 一个顶层目录里识别出的多部作品 (正篇、新编集版、剧场版…). */
+@Serializable
+data class MediaCollection(
+    /** "dir:<顶层目录 fid>". */
+    val id: String,
+    val name: String,
+    /** 封面用哪部作品的图, [MediaItem.id]. */
+    val cover: String,
+    /** 作品 [MediaItem.id], 按年份排. */
+    val items: List<String>,
+)
 
 @Serializable
 enum class MediaType {

@@ -194,6 +194,34 @@ class ScraperTest {
     }
 
     @Test
+    fun collections() {
+        val e = env(LibraryConfig("/没看", LibraryType.AUTO))
+        val root = e.root
+        // 剧 + 剧: 名字和封面用集数最多的那部
+        touch(root, "没看/Q 全职猎人 4K 合集/全职猎人 1999/01.mp4")
+        touch(root, "没看/Q 全职猎人 4K 合集/全职猎人 2011/01.mp4")
+        touch(root, "没看/Q 全职猎人 4K 合集/全职猎人 2011/02.mp4")
+        // 全是电影: 名字用目录名, 封面用最早的
+        touch(root, "没看/沙丘系列/沙丘/Dune.2021.mkv")
+        touch(root, "没看/沙丘系列/沙丘2/Dune.Part.Two.2024.mkv")
+        // 顶层目录里只有一部的不算合集
+        touch(root, "没看/漫长的季节 (2023)/E01.mkv")
+        e.decide("没看/Q 全职猎人 4K 合集/全职猎人 1999", "tv:2002")
+        e.decide("没看/Q 全职猎人 4K 合集/全职猎人 2011", "tv:46298")
+        e.decide("没看/沙丘系列/沙丘", "movie:438631")
+        e.decide("没看/沙丘系列/沙丘2", "movie:693134")
+        e.decide("没看/漫长的季节 (2023)", "tv:221851")
+
+        val (library, _) = e.scraper.build(e.scan(), e.store.load(), write = false)
+        val byName = library.collections.associateBy { it.name }
+        assertEquals(setOf("全职猎人", "沙丘系列"), byName.keys)
+        assertEquals("tv:46298", byName.getValue("全职猎人").cover)
+        assertEquals(listOf("tv:2002", "tv:46298"), byName.getValue("全职猎人").items)
+        assertEquals("movie:438631", byName.getValue("沙丘系列").cover)
+        assertEquals(listOf("movie:438631", "movie:693134"), byName.getValue("沙丘系列").items)
+    }
+
+    @Test
     fun mappingBackup() {
         val e = env(LibraryConfig("/没看", LibraryType.AUTO))
         File(e.root, "没看").mkdirs()

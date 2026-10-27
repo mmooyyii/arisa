@@ -16,8 +16,10 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import arisa.app.ui.CollectionScreen
 import arisa.app.ui.DetailScreen
 import arisa.app.ui.HomeScreen
 import arisa.app.ui.LoginScreen
@@ -30,6 +32,7 @@ import arisa.app.ui.SettingsScreen
 sealed interface Screen {
     data object Home : Screen
     data class Detail(val id: String) : Screen
+    data class Collection(val id: String) : Screen
     data class Search(val query: String = "") : Screen
     data object Settings : Screen
 }
@@ -66,12 +69,14 @@ class MainActivity : ComponentActivity() {
     private fun Navigation(onLogout: () -> Unit) {
         val app = ArisaApp.instance
         val stack = remember { mutableStateListOf<Screen>(Screen.Home) }
+        // 每层页面的滚动位置、焦点等存在这里, 返回时回到进去之前的地方; 出栈的页面清掉
+        val saveable = rememberSaveableStateHolder()
         LaunchedEffect(Unit) {
             app.library.loadCached()
             app.library.refresh()
             app.syncProgress(onlyIfDirty = false)
         }
-        BackHandler(enabled = stack.size > 1) { stack.removeAt(stack.lastIndex) }
+        BackHandler(enabled = stack.size > 1) { saveable.removeState(stack.removeAt(stack.lastIndex).toString()) }
 
         fun play(itemId: String, fid: String, fromStart: Boolean) {
             startActivity(
@@ -82,9 +87,11 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        when (val screen = stack.last()) {
+        val screen = stack.last()
+        saveable.SaveableStateProvider(screen.toString()) { when (screen) {
             Screen.Home -> HomeScreen(
                 onOpen = { stack += Screen.Detail(it) },
+                onOpenCollection = { stack += Screen.Collection(it) },
                 onPlay = { item, fid -> play(item, fid, false) },
                 onSearch = { stack += Screen.Search() },
                 onSettings = { stack += Screen.Settings },
@@ -94,8 +101,9 @@ class MainActivity : ComponentActivity() {
                 onPlay = { fid, fromStart -> play(screen.id, fid, fromStart) },
                 onSearch = { stack += Screen.Search(it) },
             )
+            is Screen.Collection -> CollectionScreen(screen.id, onOpen = { stack += Screen.Detail(it) })
             is Screen.Search -> SearchScreen(screen.query, onOpen = { stack += Screen.Detail(it) })
             Screen.Settings -> SettingsScreen(onLogout = onLogout)
-        }
+        } }
     }
 }

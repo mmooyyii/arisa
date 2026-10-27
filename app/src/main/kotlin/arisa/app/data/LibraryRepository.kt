@@ -11,6 +11,7 @@ import okhttp3.OkHttpClient
 import okhttp3.Request
 import arisa.library.Library
 import arisa.library.LibraryCodec
+import arisa.library.MediaCollection
 import arisa.library.MediaFile
 import arisa.library.MediaItem
 import arisa.library.SubtitleFile
@@ -113,6 +114,8 @@ class LibraryRepository(
     }
 
     fun item(id: String): MediaItem? = _library.value?.items?.firstOrNull { it.id == id }
+
+    fun collection(id: String): MediaCollection? = _library.value?.collections?.firstOrNull { it.id == id }
 
     /** 没识别出来的视频, 不属于任何作品, 按 fid 找. */
     fun unmatchedFile(fid: String): MediaFile? = _library.value?.unmatched?.firstOrNull { it.fid == fid }

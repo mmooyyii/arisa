@@ -1,5 +1,8 @@
 package arisa.app.ui
 
+import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.runtime.withFrameNanos
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
@@ -42,15 +45,26 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import arisa.app.ArisaApp
 import arisa.app.data.LibraryRepository
+import arisa.library.Library
+import arisa.library.MediaCollection
 import arisa.library.MediaItem
 import arisa.library.MediaType
 import arisa.library.tmdbImage
 
-private data class Shelf(val title: String, val items: List<MediaItem>)
+/**
+ * 首页的一张海报: 单部作品, 或者一个合集.
+ * 合集用封面作品的图和信息, 片名换成合集名, 加入时间取最近加入的那部.
+ */
+private data class Entry(val item: MediaItem, val collection: MediaCollection? = null) {
+    val key get() = collection?.id ?: item.id
+}
+
+private data class Shelf(val title: String, val entries: List<Entry>)
 
 @Composable
 fun HomeScreen(
     onOpen: (String) -> Unit,
+    onOpenCollection: (String) -> Unit,
     onPlay: (itemId: String, fid: String) -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
@@ -68,11 +82,18 @@ fun HomeScreen(
     }
 
     val continueWatching = remember(lib, progress) { app.progress.continueWatching(lib, progress) }
-    val shelves = remember(lib) { buildShelves(lib.items) }
+    val shelves = remember(lib) { buildShelves(entries(lib)) }
 
+    // 记住最后聚焦的卡片 ("行:作品"), 从详情页返回时焦点回到那里, 不回第一个
+    var lastFocus by rememberSaveable { mutableStateOf<String?>(null) }
     // 文字跟着焦点立刻变; 背景大图焦点一到就开始加载, 停留 300ms 后才切:
     // 遥控器连按时背景不动, 换背景对电视 GPU 是重活
-    var focused by remember { mutableStateOf(continueWatching.firstOrNull()?.item ?: lib.items.firstOrNull()) }
+    var focused by remember {
+        mutableStateOf(
+            lastFocus?.substringAfter(':')?.let { id -> lib.items.firstOrNull { it.id == id } }
+                ?: continueWatching.firstOrNull()?.item ?: lib.items.firstOrNull()
+        )
+    }
     var hero by remember { mutableStateOf(focused) }
     val context = LocalContext.current
     LaunchedEffect(focused) {
@@ -82,7 +103,16 @@ fun HomeScreen(
     }
 
     val firstFocus = remember { FocusRequester() }
-    LaunchedEffect(Unit) { runCatching { firstFocus.requestFocus() } }
+    val restoreFocus = remember { FocusRequester() }
+    LaunchedEffect(Unit) {
+        // 卡片要等列表按保存的位置排好才能聚焦, 等一帧再试
+        withFrameNanos { }
+        if (lastFocus == null || runCatching { restoreFocus.requestFocus() }.isFailure) runCatching { firstFocus.requestFocus() }
+    }
+    fun Modifier.track(key: String, isFirst: Boolean) = this
+        .then(if (isFirst) Modifier.focusRequester(firstFocus) else Modifier)
+        .then(if (key == lastFocus) Modifier.focusRequester(restoreFocus) else Modifier)
+        .onFocusChanged { if (it.hasFocus) lastFocus = key }
 
     Box(Modifier.fillMaxSize()) {
         Backdrop(hero)
@@ -93,6 +123,7 @@ fun HomeScreen(
             Spacer(Modifier.height(12.dp))
 
             LazyColumn(
+                state = rememberLazyListState(),
                 contentPadding = PaddingValues(bottom = 48.dp),
                 verticalArrangement = Arrangement.spacedBy(28.dp),
                 modifier = Modifier.fillMaxWidth(),
@@ -122,7 +153,7 @@ fun HomeScreen(
                                         fallback = parseColor(entry.item.art.color),
                                         width = 232.dp,
                                         modifier = Modifier
-                                            .then(if (entry == continueWatching.first()) Modifier.focusRequester(firstFocus) else Modifier)
+                                            .track("continue:${entry.item.id}", isFirst = entry == continueWatching.first())
                                             .onFocusChanged { if (it.hasFocus) focused = entry.item },
                                     )
                                 }
@@ -138,14 +169,16 @@ fun HomeScreen(
                                 contentPadding = PaddingValues(horizontal = 56.dp),
                                 horizontalArrangement = Arrangement.spacedBy(18.dp),
                             ) {
-                                items(shelf.items, key = { it.id }) { item ->
-                                    val isFirst = continueWatching.isEmpty() && index == 0 && item == shelf.items.first()
+                                items(shelf.entries, key = { it.key }) { entry ->
+                                    val isFirst = continueWatching.isEmpty() && index == 0 && entry == shelf.entries.first()
+                                    val c = entry.collection
                                     PosterCard(
-                                        item = item,
-                                        onClick = { onOpen(item.id) },
+                                        item = entry.item,
+                                        onClick = { if (c != null) onOpenCollection(c.id) else onOpen(entry.item.id) },
+                                        badge = c?.let { "合集 · ${it.items.size} 部" },
                                         modifier = Modifier
-                                            .then(if (isFirst) Modifier.focusRequester(firstFocus) else Modifier)
-                                            .onFocusChanged { if (it.hasFocus) focused = item },
+                                            .track("${shelf.title}:${entry.key}", isFirst)
+                                            .onFocusChanged { if (it.hasFocus) focused = entry.item },
                                     )
                                 }
                             }
@@ -174,7 +207,7 @@ fun HomeScreen(
                                         progress = progress[file.fid]?.let { it.positionMs.toFloat() / it.durationMs.coerceAtLeast(1) },
                                         onClick = { onPlay("", file.fid) },
                                         width = 232.dp,
-                                        modifier = if (isFirst) Modifier.focusRequester(firstFocus) else Modifier,
+                                        modifier = Modifier.track("unmatched:${file.fid}", isFirst),
                                     )
                                 }
                             }
@@ -248,14 +281,27 @@ private fun EmptyState(status: LibraryRepository.Status, onSettings: () -> Unit)
     }
 }
 
-private fun buildShelves(items: List<MediaItem>): List<Shelf> = buildList {
-    if (items.isEmpty()) return@buildList
-    add(Shelf("最近添加", items.sortedByDescending { it.addedAt }.take(20)))
-    items.filter { it.type == MediaType.MOVIE }.takeIf { it.isNotEmpty() }?.let { add(Shelf("电影", it.sortedByDescending { m -> m.addedAt })) }
-    items.filter { it.type == MediaType.TV }.takeIf { it.isNotEmpty() }?.let { add(Shelf("剧集", it.sortedByDescending { m -> m.addedAt })) }
+/** 合集里的作品收成一张合集海报, 其余作品各一张. */
+private fun entries(lib: Library): List<Entry> {
+    val byId = lib.items.associateBy { it.id }
+    val inCollection = HashSet<String>()
+    val collections = lib.collections.mapNotNull { c ->
+        val members = c.items.mapNotNull(byId::get)
+        val cover = byId[c.cover] ?: members.firstOrNull() ?: return@mapNotNull null
+        members.mapTo(inCollection) { it.id }
+        Entry(cover.copy(title = c.name, addedAt = members.maxOf { it.addedAt }), c)
+    }
+    return lib.items.filter { it.id !in inCollection }.map { Entry(it) } + collections
+}
+
+private fun buildShelves(entries: List<Entry>): List<Shelf> = buildList {
+    if (entries.isEmpty()) return@buildList
+    add(Shelf("最近添加", entries.sortedByDescending { it.item.addedAt }.take(20)))
+    entries.filter { it.item.type == MediaType.MOVIE }.takeIf { it.isNotEmpty() }?.let { add(Shelf("电影", it.sortedByDescending { m -> m.item.addedAt })) }
+    entries.filter { it.item.type == MediaType.TV }.takeIf { it.isNotEmpty() }?.let { add(Shelf("剧集", it.sortedByDescending { m -> m.item.addedAt })) }
     // 数量最多的几个类型各一行
-    items.flatMap { it.genres }.groupingBy { it }.eachCount().entries
+    entries.flatMap { it.item.genres }.groupingBy { it }.eachCount().entries
         .sortedByDescending { it.value }.filter { it.value >= 3 }.take(4)
-        .forEach { (genre, _) -> add(Shelf(genre, items.filter { genre in it.genres }.sortedByDescending { it.rating ?: 0.0 })) }
-    items.filter { (it.rating ?: 0.0) >= 8.0 }.takeIf { it.size >= 3 }?.let { add(Shelf("高分", it.sortedByDescending { m -> m.rating })) }
+        .forEach { (genre, _) -> add(Shelf(genre, entries.filter { genre in it.item.genres }.sortedByDescending { it.item.rating ?: 0.0 })) }
+    entries.filter { (it.item.rating ?: 0.0) >= 8.0 }.takeIf { it.size >= 3 }?.let { add(Shelf("高分", it.sortedByDescending { m -> m.item.rating })) }
 }

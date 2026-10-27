@@ -6,6 +6,7 @@ import arisa.library.Episode
 import arisa.library.Library
 import arisa.library.LibraryCodec
 import arisa.library.MatchInfo
+import arisa.library.MediaCollection
 import arisa.library.MediaFile
 import arisa.library.MediaItem
 import arisa.library.MediaType
@@ -342,6 +343,7 @@ class Scraper(
         }
 
         val items = mutableListOf<MediaItem>()
+        val filesOf = HashMap<String, List<ScannedFile>>()
         for ((target, list) in byTarget) {
             val (kind, id) = list.first().second.tmdb()!!
             val eff = config.effective(list.first().first.library)
@@ -350,6 +352,7 @@ class Scraper(
                 val item = if (kind == "movie") buildMovie(tmdb, id, list.map { it.first }, eff, source)
                 else buildTv(tmdb, id, list, eff, source)
                 items += withBangumi(tmdb, item, list.firstNotNullOfOrNull { it.second.bangumi }, eff)
+                filesOf[item.id] = list.map { it.first }
             } catch (e: TmdbAuthException) {
                 throw e
             } catch (e: Exception) {
@@ -360,8 +363,9 @@ class Scraper(
         items.sortByDescending { it.addedAt }
 
         val previous = runCatching { loadLatestIndex() }.getOrNull()
-        val library = Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched)
-        log("${items.size} 部作品, ${unmatched.size} 个视频待识别")
+        val collections = collections(items, filesOf)
+        val library = Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched, collections = collections)
+        log("${items.size} 部作品, ${collections.size} 个合集, ${unmatched.size} 个视频待识别")
 
         val renames = planRenames(scan, mapping, items)
         var nfoWritten = 0
@@ -376,6 +380,30 @@ class Scraper(
             }
         }
         return library to BuildReport(items.size, unmatched.size, nfoWritten, indexName, renames)
+    }
+
+    /**
+     * 同一个顶层目录里有多部作品的, 合成一个合集 (和改名计划里的「合集」是同一个判断).
+     * 名字和封面用合集里集数最多的剧; 全是电影时名字用目录名, 封面用最早的那部.
+     */
+    private fun collections(items: List<MediaItem>, filesOf: Map<String, List<ScannedFile>>): List<MediaCollection> {
+        // 作品的文件分散在几个顶层目录时, 算在文件最多的那个里
+        val topOf = items.mapNotNull { item ->
+            val top = filesOf[item.id].orEmpty().mapNotNull { it.dirs.firstOrNull() }
+                .groupingBy { it.fid }.eachCount().maxByOrNull { it.value }?.key ?: return@mapNotNull null
+            item to filesOf.getValue(item.id).first { it.dirs.firstOrNull()?.fid == top }.dirs[0]
+        }
+        return topOf.groupBy({ it.second.fid }, { it.first }).values.filter { it.size >= 2 }.map { members ->
+            val dir = topOf.first { it.first == members[0] }.second
+            val sorted = members.sortedWith(compareBy<MediaItem, Int?>(nullsLast()) { it.year }.thenBy { it.title })
+            val mainTv = members.filter { it.type == MediaType.TV }.maxByOrNull { it.seasons.sumOf { s -> s.episodes.size } }
+            MediaCollection(
+                id = "dir:${dir.fid}",
+                name = mainTv?.title ?: dir.name,
+                cover = (mainTv ?: sorted.first()).id,
+                items = sorted.map { it.id },
+            )
+        }.sortedBy { it.id }
     }
 
     /**

@@ -235,9 +235,9 @@ private fun focusBorder() = CardDefaults.border(
 )
 
 
-/** 竖版海报卡片. */
+/** 竖版海报卡片. [badge] 显示在左下角, 合集用来标出有几部. */
 @Composable
-fun PosterCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp = 120.dp) {
+fun PosterCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp = 120.dp, badge: String? = null) {
     Card(
         onClick = onClick,
         modifier = modifier.width(width).aspectRatio(2f / 3f),
@@ -254,6 +254,17 @@ fun PosterCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifi
         if (item.poster == null) {
             Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.BottomStart) {
                 Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 3)
+            }
+        }
+        badge?.let {
+            Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.BottomStart) {
+                Text(
+                    it,
+                    style = MaterialTheme.typography.labelSmall,
+                    modifier = Modifier
+                        .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
+                        .padding(horizontal = 6.dp, vertical = 2.dp),
+                )
             }
         }
     }
@@ -320,13 +331,13 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
  * 这个版本只在焦点项超出可见区域时才滚动.
  */
 @OptIn(ExperimentalFoundationApi::class)
-val MinimalBringIntoView = object : BringIntoViewSpec {
+fun minimalBringIntoView(trailingMargin: Float = 0f) = object : BringIntoViewSpec {
     override fun calculateScrollDistance(offset: Float, size: Float, containerSize: Float): Float {
         val trailing = offset + size
         return when {
-            offset >= 0 && trailing <= containerSize -> 0f
+            offset >= 0 && trailing + trailingMargin <= containerSize -> 0f
             offset < 0 || size > containerSize -> offset
-            else -> trailing - containerSize
+            else -> minOf(trailing + trailingMargin - containerSize, offset)
         }
     }
 }

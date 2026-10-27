@@ -353,7 +353,9 @@ class Service(
             }
         }
         // 删除: 「最近」里看不到, 看回收站
-        val deleted = recycled.filter { it.time > ws.lastRecycled && !isOwnFile(it.name) }
+        // lastRecycled 为 0 是旧版本留下的状态, 只记位置
+        val deleted = if (ws.lastRecycled == 0L) emptyList()
+        else recycled.filter { it.time > ws.lastRecycled && !isOwnFile(it.name) }
         for (f in deleted) {
             val parent = f.parentFid ?: continue
             if (drive.isListed(parent)) {

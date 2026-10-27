@@ -92,11 +92,11 @@ class PlaybackSession(
                 .setEnableDecoderFallback(true)
         )
         .setLoadControl(
-            // 原盘码率高, 按字节限制缓冲: 缓冲在 Java 堆里, 电视的堆上限一般只有 192MB,
-            // 取四成 (分段下载还要占 40MB 左右), 写死 200MB 会在网速快时把堆撑爆
+            // 原盘码率高, 按字节限制缓冲: 缓冲在 Java 堆里, 取堆上限的四成 (分段下载还要占 40MB 左右),
+            // 最多 256MB. 开了 largeHeap, 电视上一般是 512MB 的四成, 4K 高码率能缓冲 20 秒左右
             DefaultLoadControl.Builder()
                 .setBufferDurationsMs(15_000, 60_000, 2_500, 5_000)
-                .setTargetBufferBytes((Runtime.getRuntime().maxMemory() * 0.4).toInt())
+                .setTargetBufferBytes(minOf(Runtime.getRuntime().maxMemory() * 0.4, 256.0 * 1024 * 1024).toInt())
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .setBackBuffer(20_000, true)
                 .build()

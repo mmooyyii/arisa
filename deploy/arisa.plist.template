@@ -1,27 +1,33 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  launchd 模板: __HOME__ 换成家目录, __JAVA_HOME__ 换成 JDK 17+ 的路径,
+  存成 ~/Library/LaunchAgents/com.arisa.scraper.plist 后 launchctl bootstrap gui/$(id -u) <plist>
+-->
 <plist version="1.0">
 <dict>
     <key>Label</key>
-    <string>com.yimo.arisa</string>
+    <string>com.arisa.scraper</string>
     <key>ProgramArguments</key>
     <array>
-        <string>/Users/yimo/.local/bin/arisa-scraper</string>
+        <string>__HOME__/.local/bin/arisa-scraper</string>
         <string>serve</string>
     </array>
     <key>EnvironmentVariables</key>
     <dict>
         <!-- 要能找到 java 和 arisa-scraper -->
         <key>PATH</key>
-        <string>/Users/yimo/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
+        <key>JAVA_HOME</key>
+        <string>__JAVA_HOME__</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>
     <key>KeepAlive</key>
     <true/>
     <key>StandardOutPath</key>
-    <string>/Users/yimo/.arisa/logs/serve.log</string>
+    <string>__HOME__/.arisa/logs/serve.log</string>
     <key>StandardErrorPath</key>
-    <string>/Users/yimo/.arisa/logs/serve.log</string>
+    <string>__HOME__/.arisa/logs/serve.log</string>
 </dict>
 </plist>

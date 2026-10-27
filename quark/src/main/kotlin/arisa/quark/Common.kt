@@ -1,6 +1,7 @@
 package arisa.quark
 
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.jsonPrimitive
@@ -9,6 +10,7 @@ import java.security.MessageDigest
 import java.util.concurrent.TimeUnit
 
 /** 两套接口共用的文件模型. */
+@Serializable
 data class QuarkFile(
     val fid: String,
     val name: String,
@@ -20,6 +22,15 @@ data class QuarkFile(
     val updatedAt: Long,
     /** 夸克生成的缩略图 (视频是一帧截图), 没有时为 null. */
     val thumbnail: String? = null,
+    val parentFid: String? = null,
+)
+
+/** "最近" 里的一条记录: 一次转存、上传、播放等, 带涉及的文件. */
+data class RecentRecord(
+    /** SAVE_SHARE / UPLOAD_FILE / PLAY / VIEW_FILE ... */
+    val source: String,
+    val time: Long,
+    val files: List<QuarkFile>,
 )
 
 /** 取到的播放/下载地址, 请求时要带上 [headers]. */

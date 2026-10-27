@@ -62,6 +62,8 @@ data class PendingWork(
     val nfo: String? = null,
     /** 规则在 TMDB 上搜到的候选, 按得分排序. */
     val candidates: List<PendingCandidate> = emptyList(),
+    /** 其中一个视频的 fid, 看缩略图用. */
+    val sampleFid: String? = null,
 )
 
 @Serializable
@@ -158,10 +160,14 @@ class Scraper(
 
     // ---------- 待识别 ----------
 
-    /** 没有映射的视频, 按规则分成作品. [withCandidates] 时顺带查 TMDB 给出候选. */
-    fun pending(scan: Scan, mapping: Mapping, withCandidates: Boolean): List<PendingWork> {
+    /**
+     * 没有映射的视频, 按规则分成作品. [withCandidates] 时顺带查 TMDB 给出候选.
+     * [only] 不为 null 时只返回这些 key 的作品.
+     */
+    fun pending(scan: Scan, mapping: Mapping, withCandidates: Boolean, only: Set<String>? = null): List<PendingWork> {
         val unresolved = scan.files.filter { mapping.resolve(it) == null }
-        return unresolved.groupBy { it.library }.flatMap { (lib, files) -> group(lib, files) }.map { w ->
+        val works = unresolved.groupBy { it.library }.flatMap { (lib, files) -> group(lib, files) }
+        return works.filter { only == null || it.key in only }.map { w ->
             val candidates = if (withCandidates && tmdb != null && w.parsed.titles.isNotEmpty()) {
                 runCatching { candidates(w.kind, w.parsed, config.defaults.language) }
                     .onFailure { if (it is TmdbAuthException) throw it }
@@ -177,6 +183,7 @@ class Scraper(
                 rules = PendingParse(w.parsed.titles, w.parsed.year, w.parsed.season, w.parsed.episode),
                 nfo = nfoTarget(w),
                 candidates = candidates,
+                sampleFid = w.first.file.fid,
             )
         }
     }
@@ -186,15 +193,15 @@ class Scraper(
      * 其余留给 skill. 返回新增的映射数.
      */
     fun autoDecide(scan: Scan, store: MappingStore): Int {
-        var mapping = store.load()
-        val before = mapping.entries.size
+        val mapping = store.load()
+        val added = mutableMapOf<String, MappingEntry>()
         val unresolved = scan.files.filter { mapping.resolve(it) == null }
         for ((lib, files) in unresolved.groupBy { it.library }) {
             for (w in group(lib, files)) {
                 val eff = config.effective(lib)
                 val nfo = if (eff.existingNfo == ExistingNfo.TRUST || eff.existingNfo == ExistingNfo.MERGE) nfoTarget(w) else null
                 if (nfo != null) {
-                    mapping = mapping.with(w.key, MappingEntry(nfo, w.displayPath, by = "nfo"))
+                    added[w.key] = MappingEntry(nfo, w.displayPath, by = "nfo")
                     continue
                 }
                 if (tmdb == null || w.parsed.titles.isEmpty()) continue
@@ -202,12 +209,18 @@ class Scraper(
                     .onFailure { if (it is TmdbAuthException) throw it }
                     .getOrDefault(emptyList())
                 if (c.size == 1 && c[0].score >= eff.confidenceThreshold.coerceAtLeast(0.97)) {
-                    mapping = mapping.with(w.key, MappingEntry(c[0].target, w.displayPath, by = "rules"))
+                    added[w.key] = MappingEntry(c[0].target, w.displayPath, by = "rules")
                 }
             }
         }
-        store.save(mapping)
-        return mapping.entries.size - before
+        if (added.isEmpty()) return 0
+        var count = 0
+        // 查 TMDB 期间别人可能已经改过映射表, 只补上还没有的
+        store.update { m ->
+            added.filterKeys { it !in m.entries }.also { count = it.size }
+                .entries.fold(m) { acc, (fid, e) -> acc.with(fid, e) }
+        }
+        return count
     }
 
     private fun group(lib: LibraryConfig, files: List<ScannedFile>): List<Work> {

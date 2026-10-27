@@ -1,12 +1,11 @@
 # 复制到 ~/.arisa/config.yaml
-# 登录态 (cookie/token) 不放这里, 用 `arisa-scraper login` 存到 ~/.arisa/state.json
-# key 也可以不写在这里, 改用环境变量 ARISA_TMDB_API_KEY / ARISA_AI_API_KEY
+# 登录态 (Cookie) 不放这里, 用 `arisa-scraper login` 或管理网页存到 ~/.arisa/state.json
+# TMDB key 也可以不写在这里, 改用环境变量 ARISA_TMDB_API_KEY
 
 defaults:
   output: index+nfo          # index / index+nfo / index+full
   existing_nfo: trust        # trust / merge / ignore / overwrite
-  recognize: ai              # ai (默认, AI 为主) / rules+ai (规则失败才问 AI) / rules
-  confidence_threshold: 0.85 # 低于这个写进报告, 建议人工确认
+  confidence_threshold: 0.97 # auto 自动接受规则匹配的门槛, 低于它的交给 AI
   language: zh-CN
   fallback_language: en-US
 
@@ -14,37 +13,34 @@ tmdb:
   api_key: ""                # https://www.themoviedb.org/settings/api, v3 key 或 v4 read token 都行
   # proxy: http://127.0.0.1:7890  # 一般不用: 默认走 api.tmdb.org, 国内能直连
 
-ai:
-  provider: deepseek         # none / claude-code (本机 Claude Code) / deepseek / anthropic / openai (OpenAI 兼容, 如 Ollama)
-  # model: deepseek-chat     # 不填按 provider 默认: deepseek-chat / claude-opus-5
-  api_key: ""
-  # base_url: http://127.0.0.1:11434/v1   # provider=openai 时用
-  # proxy: http://127.0.0.1:7890          # anthropic 国内要代理, deepseek 不用
-  # effort: low                           # 只对 anthropic 生效
+# 常驻服务里自动识别用的 AI: 本机 Claude Code 无头模式 (要先在这台机器上登录 claude)
+agent:
+  enabled: true
+  command: claude            # launchd 下找不到时写绝对路径
+  # model: sonnet            # 不填用 Claude Code 默认
+  effort: low
+  batch_size: 20             # 一次交给 AI 的作品数
+  max_budget_usd: 1.0        # 单次运行的花费上限
+  timeout_minutes: 30
+
+serve:
+  port: 7893
+  poll_seconds: 90           # 多久看一次夸克的「最近」, 同时给登录续期
+  full_scan_hour: 4          # 每天几点全量重扫
 
 rate_limit:
   list_per_sec: 2
   upload_per_sec: 1
 
 scan:
-  interval_minutes: 30
-  keep_indexes: 5
+  keep_indexes: 5            # 网盘里保留几个历史索引
 
 libraries:
   - path: /电影
     type: movie
   - path: /剧集
     type: tv
-  - path: /动漫
-    type: tv
-    recognize: ai
   # - path: /来自分享
   #   type: auto
   #   output: index          # 不往这个目录里写东西
   #   existing_nfo: merge
-
-# 识别错了在这里修正, 路径可以是目录或文件
-overrides: []
-#  - path: /电影/沙丘 (1984)
-#    type: movie
-#    tmdb_id: 841

@@ -53,13 +53,26 @@ class QuarkWebClient(
             ))
             val resp = json.decodeFromJsonElement(SortResp.serializer(), obj)
             resp.data.list.mapTo(files) {
-                QuarkFile(it.fid, unescapeHtml(it.fileName), !it.file, it.size, it.category, it.updatedAt, it.thumbnail?.ifEmpty { null })
+                it.toQuarkFile()
             }
             if (resp.data.list.isEmpty() || page * size >= resp.metadata.total) break
             page++
         }
         return files
     }
+
+    /**
+     * 网页版首页的 "最近": 每次转存、上传、播放各一条, 新的在前.
+     * 用来发现网盘变化, 比遍历目录便宜得多.
+     */
+    fun recent(size: Int = 50): List<RecentRecord> {
+        val obj = request("/behavior/recent/list", "GET", mapOf("item_size" to size.toString()))
+        val resp = json.decodeFromJsonElement(RecentResp.serializer(), obj)
+        return resp.data.list.map { r -> RecentRecord(r.source, r.maxTm, r.files.map { it.toQuarkFile() }) }
+    }
+
+    private fun WebFile.toQuarkFile() =
+        QuarkFile(fid, unescapeHtml(fileName), !file, size, category, updatedAt, thumbnail?.ifEmpty { null }, pdirFid?.ifEmpty { null })
 
     /** 按 "/电影/沙丘" 这样的路径找文件或目录, 不存在返回 null. */
     fun resolve(path: String): QuarkFile? {
@@ -88,6 +101,16 @@ class QuarkWebClient(
         val req = Request.Builder().url(link.url).apply { link.headers.forEach { (k, v) -> header(k, v) } }.build()
         return http.newCall(req).execute().use {
             if (!it.isSuccessful) throw QuarkException("download ${it.code}")
+            it.body!!.bytes()
+        }
+    }
+
+    /** 夸克为视频生成的缩略图 (列目录时给的 thumbnail 地址), 要带 Cookie. */
+    fun thumbnail(url: String): ByteArray {
+        val req = Request.Builder().url(url)
+            .header("Cookie", cookie).header("Referer", REFERER).header("User-Agent", USER_AGENT).build()
+        return http.newCall(req).execute().use {
+            if (!it.isSuccessful) throw QuarkException("缩略图 ${it.code}")
             it.body!!.bytes()
         }
     }
@@ -314,6 +337,20 @@ class QuarkWebClient(
         val file: Boolean = true,
         @SerialName("updated_at") val updatedAt: Long = 0,
         val thumbnail: String? = null,
+        @SerialName("pdir_fid") val pdirFid: String? = null,
+    )
+
+    @Serializable
+    private data class RecentResp(val data: RecentData = RecentData())
+
+    @Serializable
+    private data class RecentData(val list: List<RecentItem> = emptyList())
+
+    @Serializable
+    private data class RecentItem(
+        val source: String = "",
+        @SerialName("max_tm") val maxTm: Long = 0,
+        val files: List<WebFile> = emptyList(),
     )
 
     @Serializable

@@ -3,6 +3,10 @@ package arisa.scraper
 import kotlinx.serialization.SerialName
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.add
+import kotlinx.serialization.json.buildJsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import okhttp3.HttpUrl.Companion.toHttpUrl
 import okhttp3.OkHttpClient
 import okhttp3.Request
@@ -145,6 +149,7 @@ class Tmdb(
         @SerialName("vote_count") val voteCount: Int = 0,
         @SerialName("genre_ids") val genreIds: List<Int> = emptyList(),
         @SerialName("original_language") val originalLanguage: String? = null,
+        @SerialName("poster_path") val posterPath: String? = null,
     ) {
         val displayTitle get() = title ?: name ?: ""
         val displayOriginal get() = originalTitle ?: originalName
@@ -264,4 +269,38 @@ class Tmdb(
 
     @Serializable
     data class ContentRating(@SerialName("iso_3166_1") val country: String, val rating: String = "")
+}
+
+/** tmdb search 的输出, 给 AI 和网页用. [kind] 为 null 时电影、剧集都搜. */
+fun tmdbSearchJson(tmdb: TmdbApi, query: String, kind: String?, year: Int?, language: String) = buildJsonArray {
+    fun addAll(kind: String, results: List<Tmdb.SearchResult>) = results.take(8).forEach { r ->
+        add(buildJsonObject {
+            put("target", "$kind:${r.id}")
+            put("title", r.displayTitle)
+            r.displayOriginal?.takeIf { it != r.displayTitle }?.let { put("original", it) }
+            r.year?.let { put("year", it) }
+            put("popularity", r.popularity)
+            r.posterPath?.let { put("poster", it) }
+            r.overview?.takeIf { it.isNotBlank() }?.let { put("overview", it.take(100)) }
+        })
+    }
+    if (kind != "tv") addAll("movie", tmdb.searchMovie(query, year, language))
+    if (kind != "movie") addAll("tv", tmdb.searchTv(query, year, language))
+}
+
+/** tmdb show 的输出, 剧集带每季集数. */
+fun tmdbShowJson(tmdb: TmdbApi, kind: String, id: Int, language: String) = buildJsonObject {
+    val d = if (kind == "movie") tmdb.movie(id, language) else tmdb.tv(id, language)
+    put("target", "$kind:$id")
+    put("title", d.displayTitle)
+    d.displayOriginal?.let { put("original", it) }
+    d.year?.let { put("year", it) }
+    d.runtime?.let { put("runtime", it) }
+    d.posterPath?.let { put("poster", it) }
+    d.overview?.let { put("overview", it.take(200)) }
+    put("seasons", buildJsonArray {
+        d.seasons.forEach { s ->
+            add(buildJsonObject { put("season", s.seasonNumber); put("name", s.name ?: ""); put("episodes", s.episodeCount) })
+        }
+    })
 }

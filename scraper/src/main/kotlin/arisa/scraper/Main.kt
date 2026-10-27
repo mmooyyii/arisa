@@ -6,6 +6,8 @@ import arisa.quark.QuarkTvClient
 import arisa.quark.QuarkWebClient
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -29,6 +31,7 @@ private const val USAGE = """arisa-scraper <命令> [参数]
   ls [路径]                     列目录
   inspect <网盘目录>             只读遍历, 用规则解析每个视频
   thumbnail <网盘路径> <输出文件> 下载夸克为视频生成的缩略图 (不下载视频)
+  thumbnail --fid <fid> <输出文件>  同上, 按 fid (需要常驻服务的扫描缓存)
   link <路径> / tv-link <路径>   取直链
   put <本地文件> <网盘目录> / rm <网盘路径>
 
@@ -39,13 +42,15 @@ private const val USAGE = """arisa-scraper <命令> [参数]
   tmdb show <movie|tv> <id>     详情, 剧集含每季集数
   decide <fid> <movie:ID|tv:ID|skip> [--season N] [--note 说明]
   undecide <fid>
+  ask <key> --reason 原因 [--guess movie:ID|tv:ID]   拿不准, 交给用户在网页上确认
   mapping                       查看映射表
+  guide                         识别规则 (skill 和服务里的 AI 共用)
 
 生成:
   build [--dry-run]             按映射表生成索引和 NFO (增量, 内容没变不上传)
   rename                        生成改名计划 ~/.arisa/rename-plan.txt (不改网盘)
   rename --apply                按计划文件改名
-  daemon                        常驻: 定时 build, 定期请求夸克保持登录
+  serve                         常驻服务: 盯网盘变化、自动识别、生成索引, 带管理网页
 
 选项:
   --config <文件>   默认 ~/.arisa/config.yaml
@@ -100,12 +105,14 @@ fun main(argv: Array<String>) {
             }
             "thumbnail" -> {
                 val client = web(state)
-                val f = client.resolve(args[0]) ?: error("路径不存在")
-                val url = f.thumbnail ?: error("夸克没有为这个文件生成缩略图")
-                val out = File(args[1])
-                val bytes = httpClient(null).newCall(okhttp3.Request.Builder().url(url).header("Referer", "https://pan.quark.cn/").build())
-                    .execute().use { r -> check(r.isSuccessful) { "下载缩略图失败 ${r.code}" }; r.body!!.bytes() }
-                out.writeBytes(bytes)
+                val drive = QuarkDrive(client, Config.load(configFile).rateLimit)
+                val byFid = takeOption(args, "--fid")
+                val f = if (byFid != null) {
+                    // 用服务的扫描缓存找到文件所在目录, 再重新列一次拿到新的缩略图地址
+                    CachingDrive(drive, File(home, "scan-cache.json")).fresh(byFid) ?: error("扫描缓存里没有 $byFid")
+                } else client.resolve(args.removeFirst()) ?: error("路径不存在")
+                val out = File(args.first())
+                out.writeBytes(drive.thumbnail(f))
                 println(out.absolutePath)
             }
             "link" -> {
@@ -160,18 +167,28 @@ fun main(argv: Array<String>) {
                 val season = takeOption(args, "--season")?.toInt()
                 val note = takeOption(args, "--note")
                 val ctx = context(configFile, state, needTmdb = false, quiet = true)
-                val mapping = ctx.store.load()
                 val path = pathFromPending(fid) ?: fid
-                ctx.store.save(mapping.with(fid, MappingEntry(target, path, season, note, by = "skill")))
+                ctx.store.update { it.with(fid, MappingEntry(target, path, season, note, by = "skill")) }
                 println("$path → $target${season?.let { " 第 $it 季" } ?: ""}")
             }
             "undecide" -> {
                 val ctx = context(configFile, state, needTmdb = false, quiet = true)
-                val mapping = ctx.store.load()
-                require(args.first() in mapping.entries) { "映射表里没有 ${args.first()}" }
-                ctx.store.save(mapping.without(args.first()))
+                ctx.store.update { mapping ->
+                    require(args.first() in mapping.entries) { "映射表里没有 ${args.first()}" }
+                    mapping.without(args.first())
+                }
                 println("已删除")
             }
+            "ask" -> {
+                val key = args.removeFirst()
+                val reason = takeOption(args, "--reason") ?: error("要写 --reason")
+                val guess = takeOption(args, "--guess")
+                require(guess == null || MappingEntry.validTarget(guess)) { "--guess 要写成 movie:ID / tv:ID" }
+                val work = pendingWorks().firstOrNull { it.key == key } ?: error("待识别列表里没有 $key")
+                ReviewStore(File(home, "review.json")).add(ReviewEntry(work, reason, guess))
+                println("已交给用户确认: ${work.path}")
+            }
+            "guide" -> print(guideText())
             "mapping" -> {
                 val ctx = context(configFile, state, needTmdb = false, quiet = true)
                 println(json.encodeToString(Mapping.serializer(), ctx.store.load()))
@@ -208,7 +225,10 @@ fun main(argv: Array<String>) {
                     println("\n计划已写到 $planFile, 确认后运行 rename --apply")
                 }
             }
-            "daemon" -> daemon(configFile, state)
+            "serve" -> {
+                Service(home, configFile, state).start()
+                Thread.currentThread().join()
+            }
 
             // 给片库 JSON 补主色调和 BlurHash (生成演示数据用)
             "enrich" -> {
@@ -234,9 +254,13 @@ fun main(argv: Array<String>) {
 private class Context(val scraper: Scraper, val store: MappingStore, val drive: QuarkDrive)
 
 /** 从上一次 pending 的输出里查 fid 对应的路径 (作品 key 或某一级目录). */
+private fun pendingWorks(): List<PendingWork> {
+    val file = File(home, "pending.json").takeIf { it.exists() } ?: return emptyList()
+    return runCatching { json.decodeFromString(ListSerializer(PendingWork.serializer()), file.readText()) }.getOrDefault(emptyList())
+}
+
 private fun pathFromPending(fid: String): String? {
-    val file = File(home, "pending.json").takeIf { it.exists() } ?: return null
-    val works = runCatching { json.decodeFromString(ListSerializer(PendingWork.serializer()), file.readText()) }.getOrNull() ?: return null
+    val works = pendingWorks()
     works.firstOrNull { it.key == fid }?.let { return it.path }
     for (w in works) {
         val i = w.dirs.indexOfFirst { it.fid == fid }
@@ -275,43 +299,6 @@ private fun build(ctx: Context, write: Boolean) {
     println("${report.items} 部作品, ${report.pending} 个视频待识别, 写 NFO ${report.nfoWritten} 个, 建议改名 ${renames.size} 个")
 }
 
-/**
- * 常驻: 每 interval_minutes 生成一次索引; 每 keepalive_hours 至少请求一次夸克, 让 Cookie 续期.
- * 登录失效时不退出 (launchd 会不停重启), 写 ~/.arisa/login-expired 标记, 每小时重试, 重新 login 后自动恢复.
- */
-private fun daemon(configFile: File, state: StateStore) {
-    val expiredMark = File(home, "login-expired")
-    var lastKeepalive = 0L
-    var lastBuild = 0L
-    while (true) {
-        val config = Config.load(configFile)
-        val now = System.currentTimeMillis()
-        val buildDue = now - lastBuild >= config.scan.intervalMinutes * 60_000L
-        val keepaliveDue = now - lastKeepalive >= config.scan.keepaliveHours * 3_600_000L
-        val retryDue = expiredMark.exists() && now - lastBuild >= 3_600_000L
-        if (buildDue && !expiredMark.exists() || retryDue || keepaliveDue) {
-            try {
-                if (buildDue || retryDue) {
-                    build(context(configFile, state, needTmdb = true), write = true)
-                    lastBuild = now
-                } else {
-                    web(state).member()
-                }
-                lastKeepalive = now
-                if (expiredMark.delete()) println("${java.time.LocalDateTime.now()} 登录已恢复")
-            } catch (e: LoginExpiredException) {
-                if (!expiredMark.exists()) println("${java.time.LocalDateTime.now()} ${e.message}")
-                expiredMark.writeText("${java.time.LocalDateTime.now()} ${e.message}\n")
-                lastBuild = now
-            } catch (e: Exception) {
-                println("${java.time.LocalDateTime.now()} 失败: ${e.message}")
-                lastBuild = now
-            }
-        }
-        Thread.sleep(60_000)
-    }
-}
-
 private fun tmdbCommand(args: MutableList<String>, config: Config) {
     require(config.tmdb.apiKey.isNotBlank()) { "没有 TMDB API Key" }
     val tmdb = Tmdb(config.tmdb.apiKey, httpClient(config.tmdb.proxy), File(home, "cache/tmdb"))
@@ -321,42 +308,10 @@ private fun tmdbCommand(args: MutableList<String>, config: Config) {
             val tv = args.remove("--tv")
             val movie = args.remove("--movie")
             val year = takeOption(args, "--year")?.toInt()
-            val query = args.joinToString(" ")
-            val out = buildJsonArray {
-                fun addAll(kind: String, results: List<Tmdb.SearchResult>) = results.take(8).forEach { r ->
-                    add(buildJsonObject {
-                        put("target", "$kind:${r.id}")
-                        put("title", r.displayTitle)
-                        r.displayOriginal?.takeIf { it != r.displayTitle }?.let { put("original", it) }
-                        r.year?.let { put("year", it) }
-                        put("popularity", r.popularity)
-                        r.overview?.takeIf { it.isNotBlank() }?.let { put("overview", it.take(100)) }
-                    })
-                }
-                if (!tv) addAll("movie", tmdb.searchMovie(query, year, lang))
-                if (!movie) addAll("tv", tmdb.searchTv(query, year, lang))
-            }
-            println(json.encodeToString(kotlinx.serialization.json.JsonArray.serializer(), out))
+            val kind = if (tv) "tv" else if (movie) "movie" else null
+            println(json.encodeToString(JsonArray.serializer(), tmdbSearchJson(tmdb, args.joinToString(" "), kind, year, lang)))
         }
-        "show" -> {
-            val kind = args[0]
-            val id = args[1].toInt()
-            val d = if (kind == "movie") tmdb.movie(id, lang) else tmdb.tv(id, lang)
-            val out = buildJsonObject {
-                put("target", "$kind:$id")
-                put("title", d.displayTitle)
-                d.displayOriginal?.let { put("original", it) }
-                d.year?.let { put("year", it) }
-                d.runtime?.let { put("runtime", it) }
-                d.overview?.let { put("overview", it.take(200)) }
-                put("seasons", buildJsonArray {
-                    d.seasons.forEach { s ->
-                        add(buildJsonObject { put("season", s.seasonNumber); put("name", s.name ?: ""); put("episodes", s.episodeCount) })
-                    }
-                })
-            }
-            println(json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), out))
-        }
+        "show" -> println(json.encodeToString(JsonObject.serializer(), tmdbShowJson(tmdb, args[0], args[1].toInt(), lang)))
         else -> error("用法: tmdb search <片名> [--tv|--movie] [--year Y] / tmdb show <movie|tv> <id>")
     }
 }

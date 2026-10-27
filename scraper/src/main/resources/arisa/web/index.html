@@ -1,0 +1,275 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Arisa 刮削</title>
+<style>
+  :root {
+    --bg: #0f1115; --panel: #171a21; --panel2: #1e222b; --line: #2a2f3a;
+    --text: #e6e8ec; --dim: #8b93a3; --accent: #7aa2ff; --ok: #4cc38a; --warn: #f0b75a; --bad: #ef6b6b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.5 -apple-system, "PingFang SC", sans-serif; }
+  header { padding: 18px 28px; border-bottom: 1px solid var(--line); display: flex; align-items: center; gap: 18px; flex-wrap: wrap; }
+  h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: .5px; }
+  h1 span { color: var(--accent); }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; flex: 1; }
+  .chip { background: var(--panel2); border: 1px solid var(--line); border-radius: 999px; padding: 3px 10px; color: var(--dim); white-space: nowrap; }
+  .chip b { color: var(--text); font-weight: 500; }
+  .chip.busy { border-color: var(--accent); color: var(--accent); }
+  main { padding: 20px 28px; max-width: 1200px; margin: 0 auto; }
+  button { background: var(--panel2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 12px; cursor: pointer; font: inherit; }
+  button:hover { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: #0b1020; border-color: var(--accent); font-weight: 600; }
+  button.danger:hover { border-color: var(--bad); color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  input, select, textarea { background: var(--bg); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; font: inherit; }
+  input:focus, select:focus, textarea:focus { outline: none; border-color: var(--accent); }
+  .banner { border-radius: 10px; padding: 14px 16px; margin-bottom: 16px; border: 1px solid; }
+  .banner.bad { border-color: var(--bad); background: #2a1618; }
+  .banner.warn { border-color: var(--warn); background: #2a2214; }
+  .banner textarea { width: 100%; height: 70px; margin: 8px 0; }
+  .tabs { display: flex; gap: 4px; margin-bottom: 16px; border-bottom: 1px solid var(--line); }
+  .tab { background: none; border: none; border-bottom: 2px solid transparent; border-radius: 0; padding: 10px 14px; color: var(--dim); }
+  .tab.on { color: var(--text); border-bottom-color: var(--accent); }
+  .tab .n { background: var(--panel2); border-radius: 999px; padding: 0 7px; margin-left: 4px; font-size: 12px; }
+  .empty { color: var(--dim); padding: 40px; text-align: center; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; margin-bottom: 14px; display: grid; grid-template-columns: 240px 1fr; gap: 18px; }
+  .thumb { width: 240px; aspect-ratio: 16/9; object-fit: cover; border-radius: 8px; background: var(--panel2); }
+  .path { font-weight: 600; word-break: break-all; }
+  .meta { color: var(--dim); font-size: 13px; }
+  .reason { color: var(--warn); margin: 6px 0; }
+  .samples { color: var(--dim); font-size: 12px; font-family: ui-monospace, Menlo, monospace; margin: 6px 0; max-height: 84px; overflow: auto; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-top: 8px; }
+  .cands { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 8px; }
+  .cand { display: flex; gap: 8px; align-items: center; background: var(--panel2); border: 1px solid var(--line); border-radius: 8px; padding: 6px; cursor: pointer; max-width: 340px; }
+  .cand:hover { border-color: var(--accent); }
+  .cand img { width: 40px; height: 60px; object-fit: cover; border-radius: 4px; background: var(--bg); flex: none; }
+  .cand .t { font-weight: 500; }
+  .cand .s { color: var(--dim); font-size: 12px; }
+  .cand.guess { border-color: var(--ok); }
+  table { width: 100%; border-collapse: collapse; }
+  td, th { padding: 8px; border-bottom: 1px solid var(--line); text-align: left; vertical-align: top; }
+  th { color: var(--dim); font-weight: 500; }
+  tr.skip td { color: var(--dim); }
+  .arrow { color: var(--accent); }
+  .log { font-family: ui-monospace, Menlo, monospace; font-size: 12px; white-space: pre-wrap; color: var(--dim); }
+  .log div { padding: 2px 0; border-bottom: 1px solid #1a1d24; }
+  .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; display: none; }
+  .search { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+</style>
+</head>
+<body>
+<header>
+  <h1><span>Arisa</span> 刮削</h1>
+  <div class="chips" id="chips"></div>
+  <button onclick="scan(false)">增量扫描</button>
+  <button onclick="scan(true)">全量扫描</button>
+</header>
+<main>
+  <div id="banners"></div>
+  <div class="tabs">
+    <button class="tab on" data-tab="review">待确认<span class="n" id="n-review">0</span></button>
+    <button class="tab" data-tab="renames">改名<span class="n" id="n-renames">0</span></button>
+    <button class="tab" data-tab="activity">动态</button>
+  </div>
+  <section id="review"></section>
+  <section id="renames" hidden></section>
+  <section id="activity" hidden class="log"></section>
+</main>
+<div class="toast" id="toast"></div>
+
+<script>
+const $ = s => document.querySelector(s);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const IMG = 'https://image.tmdb.org/t/p/w92';
+let tab = 'review';
+
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : { method: 'POST', body: JSON.stringify(body) });
+  const j = await r.json();
+  if (!r.ok) throw new Error(j.error || r.status);
+  return j;
+}
+function toast(msg) {
+  const t = $('#toast'); t.textContent = msg; t.style.display = 'block';
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.style.display = 'none', 3000);
+}
+async function act(fn, msg) {
+  try { await fn(); if (msg) toast(msg); } catch (e) { toast('出错: ' + e.message); }
+  refresh();
+}
+
+document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
+  tab = b.dataset.tab;
+  document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
+  for (const id of ['review', 'renames', 'activity']) $('#' + id).hidden = id !== tab;
+  refresh();
+});
+
+function scan(full) { act(() => api('/api/scan', { full }), full ? '已排队全量扫描' : '已排队增量扫描'); }
+
+// ---------- 状态 ----------
+async function loadStatus() {
+  const s = await api('/api/status');
+  const chip = (k, v, cls = '') => `<span class="chip ${cls}">${k} <b>${esc(v)}</b></span>`;
+  $('#chips').innerHTML = [
+    s.busy ? chip('正在', s.busy, 'busy') : chip('状态', '空闲'),
+    s.queued.length ? chip('排队', s.queued.join('、')) : '',
+    chip('作品', s.items ?? '-'),
+    chip('待识别视频', s.pendingVideos ?? '-'),
+    chip('上次扫描', s.lastScan ?? '-'),
+    chip('上次索引', s.lastBuild ?? '-'),
+    chip('AI', s.agentEnabled ? `今天 $${s.agentCostToday.toFixed(2)}` : '关闭'),
+  ].join('');
+  $('#n-review').textContent = s.review;
+  $('#n-renames').textContent = s.renames;
+  let b = '';
+  if (s.loginError) b += `<div class="banner bad"><b>夸克登录失效</b>：${esc(s.loginError)}
+    <div class="meta">浏览器打开 pan.quark.cn 扫码登录，开发者工具 → 网络，复制任一 drive-pc.quark.cn 请求的 Cookie 粘贴到这里。</div>
+    <textarea id="cookie" placeholder="Cookie"></textarea>
+    <button class="primary" onclick="saveCookie()">保存</button></div>`;
+  if (s.configError) b += `<div class="banner warn">${esc(s.configError)}</div>`;
+  // 用户正在输入 Cookie 时不刷掉
+  if (!document.activeElement || document.activeElement.id !== 'cookie') $('#banners').innerHTML = b;
+}
+function saveCookie() {
+  const cookie = $('#cookie').value.trim();
+  if (cookie) act(() => api('/api/cookie', { cookie }), '已保存，开始扫描');
+}
+
+// ---------- 待确认 ----------
+let reviewSig = '';
+async function loadReview() {
+  const list = await api('/api/review');
+  const sig = JSON.stringify(list.map(e => e.work.key + e.at));
+  if (sig === reviewSig) return;   // 没变就不重画, 免得打断输入
+  reviewSig = sig;
+  if (!list.length) { $('#review').innerHTML = '<div class="empty">没有需要确认的作品</div>'; return; }
+  $('#review').innerHTML = list.map((e, i) => reviewCard(e, i)).join('');
+  list.forEach((e, i) => {
+    const el = document.getElementById('rv' + i);
+    el.entry = e;
+    if (e.guess) fillGuess(el, e.guess);
+  });
+}
+function reviewCard(e, i) {
+  const w = e.work;
+  const title = (w.rules.titles || [])[0] || '';
+  const levels = [`<option value="${esc(w.key)}">${w.guess === 'tv' ? '剧集目录' : '这个文件'}（默认）</option>`]
+    .concat((w.dirs || []).filter(d => d.fid !== w.key).map(d => `<option value="${esc(d.fid)}">目录：${esc(d.name)}</option>`));
+  const cands = (w.candidates || []).map(c => candHtml(c)).join('');
+  return `<div class="card" id="rv${i}">
+    <img class="thumb" loading="lazy" src="${w.sampleFid ? '/api/thumbnail?fid=' + encodeURIComponent(w.sampleFid) : ''}" onerror="this.style.visibility='hidden'">
+    <div>
+      <div class="path">${esc(w.path)}</div>
+      <div class="meta">${w.guess === 'tv' ? '剧集' : '电影'} · ${w.fileCount} 个视频${w.rules.year ? ' · ' + w.rules.year : ''} · ${{ai: 'AI 提问', unhandled: 'AI 没处理', error: 'AI 出错'}[e.by] || e.by}</div>
+      <div class="reason">${esc(e.reason)}</div>
+      <div class="samples">${(w.samples || []).map(esc).join('<br>')}</div>
+      <div class="guess-slot"></div>
+      ${cands ? `<div class="meta" style="margin-top:8px">规则搜到的候选：</div><div class="cands">${cands}</div>` : ''}
+      <div class="row">
+        映射到 <select class="level">${levels.join('')}</select>
+        季 <input class="season" type="number" min="0" style="width:64px" placeholder="自动">
+        <button class="danger" onclick="decideRv(this, 'skip')">不是正片，跳过</button>
+        <button onclick="retryRv(this)">重新交给 AI</button>
+      </div>
+      <div class="search row">
+        <input class="q" value="${esc(title)}" placeholder="片名" style="flex:1;min-width:200px">
+        <select class="kind"><option value="">全部</option><option value="movie">电影</option><option value="tv" ${w.guess === 'tv' ? 'selected' : ''}>剧集</option></select>
+        <input class="year" type="number" placeholder="年份" style="width:80px" value="${w.rules.year ?? ''}">
+        <button onclick="searchRv(this)">搜 TMDB</button>
+      </div>
+      <div class="cands results"></div>
+    </div>
+  </div>`;
+}
+function candHtml(c, guess) {
+  return `<div class="cand ${guess ? 'guess' : ''}" data-target="${esc(c.target)}" onclick="decideRv(this, this.dataset.target)" title="${esc(c.overview || '')}">
+    ${c.poster ? `<img src="${IMG}${esc(c.poster)}">` : '<img>'}
+    <div><div class="t">${guess ? 'AI 猜：' : ''}${esc(c.title)}${c.year ? ' (' + c.year + ')' : ''}</div>
+    <div class="s">${esc(c.original || '')} ${c.target.startsWith('tv') ? '剧集' : '电影'} ${esc(c.target)}${c.score !== undefined ? ' · ' + c.score : ''}</div>
+    <div class="s">${esc((c.overview || '').slice(0, 40))}</div></div></div>`;
+}
+async function fillGuess(card, target) {
+  const [kind, id] = target.split(':');
+  try {
+    const d = await api(`/api/tmdb/show?kind=${kind}&id=${id}`);
+    const seasons = (d.seasons || []).filter(s => s.season > 0).map(s => `S${s.season} ${s.episodes} 集`).join(' / ');
+    card.querySelector('.guess-slot').innerHTML = `<div class="cands">${candHtml({ ...d, overview: seasons || d.overview }, true)}</div>`;
+  } catch (e) {
+    card.querySelector('.guess-slot').innerHTML = `<div class="meta">AI 猜：${esc(target)}</div>`;
+  }
+}
+const cardOf = el => el.closest('.card');
+function decideRv(el, target) {
+  const card = cardOf(el), e = card.entry;
+  const fid = card.querySelector('.level').value;
+  const season = card.querySelector('.season').value;
+  const dirIdx = (e.work.dirs || []).findIndex(d => d.fid === fid);
+  const path = fid === e.work.key ? e.work.path : e.work.path.split('/' + e.work.dirs[0].name)[0] + '/' + e.work.dirs.slice(0, dirIdx + 1).map(d => d.name).join('/');
+  if (target === 'skip' && !confirm(`跳过 ${path}？以后不会入库`)) return;
+  act(() => api('/api/decide', { fid, target, season: season === '' ? null : +season, path, key: e.work.key }), '已确认，正在生成索引');
+}
+function retryRv(el) { act(() => api('/api/retry', { key: cardOf(el).entry.work.key }), '已交回 AI'); }
+async function searchRv(el) {
+  const card = cardOf(el);
+  const q = card.querySelector('.q').value.trim();
+  if (!q) return;
+  const p = new URLSearchParams({ q, kind: card.querySelector('.kind').value, year: card.querySelector('.year').value });
+  const box = card.querySelector('.results');
+  box.innerHTML = '<span class="meta">搜索中…</span>';
+  try {
+    const list = await api('/api/tmdb/search?' + p);
+    box.innerHTML = list.length ? list.map(c => candHtml(c)).join('') : '<span class="meta">没有结果，换个名字或去掉年份试试</span>';
+  } catch (e) { box.innerHTML = `<span class="meta">${esc(e.message)}</span>`; }
+}
+
+// ---------- 改名 ----------
+let renameSig = '';
+async function loadRenames() {
+  const list = await api('/api/renames');
+  const sig = JSON.stringify(list);
+  if (sig === renameSig) return;
+  renameSig = sig;
+  const todo = list.filter(p => !p.skipped), skip = list.filter(p => p.skipped);
+  if (!list.length) { $('#renames').innerHTML = '<div class="empty">没有改名建议</div>'; return; }
+  $('#renames').innerHTML = `
+    <div class="row" style="margin-bottom:12px">
+      <label><input type="checkbox" id="allrn" checked onchange="document.querySelectorAll('.rn').forEach(c => c.checked = this.checked)"> 全选</label>
+      <button class="primary" onclick="applyRenames()" ${todo.length ? '' : 'disabled'}>改名选中的</button>
+      <span class="meta">只改作品顶层目录为「片名 (年份)」，合集保留、改里面的每部</span>
+    </div>
+    <table><tr><th></th><th>目录</th><th>原名</th><th></th><th>新名</th></tr>
+    ${todo.map(p => `<tr><td><input type="checkbox" class="rn" value="${esc(p.fid)}" checked></td>
+      <td class="meta">${esc(p.parentPath)}</td><td>${esc(p.from)}</td><td class="arrow">→</td><td>${esc(p.to)}</td></tr>`).join('')}
+    ${skip.map(p => `<tr class="skip"><td></td><td>${esc(p.parentPath)}</td><td>${esc(p.from)}</td><td></td><td>不改：${esc(p.skipped)}</td></tr>`).join('')}
+    </table>`;
+}
+function applyRenames() {
+  const fids = [...document.querySelectorAll('.rn:checked')].map(c => c.value);
+  if (!fids.length) return;
+  if (!confirm(`在夸克网盘里改名 ${fids.length} 个目录？`)) return;
+  act(() => api('/api/rename', { fids }), '已排队改名');
+}
+
+// ---------- 动态 ----------
+async function loadActivity() {
+  const list = await api('/api/activity');
+  $('#activity').innerHTML = list.length ? list.map(l => `<div>${esc(l)}</div>`).join('') : '<div class="empty">暂无</div>';
+}
+
+async function refresh() {
+  try {
+    await loadStatus();
+    if (tab === 'review') await loadReview();
+    if (tab === 'renames') await loadRenames();
+    if (tab === 'activity') await loadActivity();
+  } catch (e) { $('#chips').innerHTML = `<span class="chip">连不上服务：${esc(e.message)}</span>`; }
+}
+refresh();
+setInterval(refresh, 5000);
+</script>
+</body>
+</html>

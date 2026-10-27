@@ -10,7 +10,7 @@ import kotlin.test.assertTrue
 
 private fun norm(s: String) = s.lowercase().replace(Regex("[^\\p{L}\\p{N}|]"), "")
 
-private class FakeTmdb : TmdbApi {
+internal class FakeTmdb : TmdbApi {
     val movies = mapOf(
         693134 to Tmdb.Details(id = 693134, title = "沙丘2", originalTitle = "Dune: Part Two", releaseDate = "2024-02-27", overview = "保罗…", posterPath = "/p1.jpg", runtime = 167),
         438631 to Tmdb.Details(id = 438631, title = "沙丘", originalTitle = "Dune", releaseDate = "2021-09-15", overview = "…", posterPath = "/p0.jpg"),

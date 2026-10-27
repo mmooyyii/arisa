@@ -23,17 +23,23 @@ TV 和 mac mini 不直接通信, TV 只需要扫码登录夸克.
 
 ```sh
 ./gradlew :scraper:installDist
-cp config.example.yaml ~/.arisa/config.yaml   # 填 tmdb.api_key、ai 配置、片库目录
+cp config.example.yaml ~/.arisa/config.yaml   # 填 tmdb.api_key 和片库目录
 S=scraper/build/install/arisa-scraper/bin/arisa-scraper
 $S login                 # 粘贴 pan.quark.cn 的 Cookie
 $S ls /电影              # 确认能列目录
-$S scan --dry-run        # 只识别不写网盘, 看 ~/.arisa/report.txt
-$S scan                  # 写索引和 NFO
-$S daemon                # 常驻定时扫描
+$S serve                 # 常驻服务, 管理网页 http://localhost:7893
 ```
 
-识别流程: 人工修正 (`overrides`) → 已有 NFO → 上次识别结果 → 规则解析文件名 / AI 解析 → TMDB 搜索 → 规则或 AI 在候选里选.
-AI 只做"解析文件名"和"在 TMDB 候选里选一个", 不生成元数据.
+常驻服务 (`serve`) 的流程:
+
+1. 每 90 秒看一次夸克的「最近」(转存、上传), 落在片库里的目录让扫描缓存失效, 增量扫描; 每天凌晨全量扫一次 (移动、删除在「最近」里看不到).
+2. 规则能确定的直接记进映射表: 视频旁已有 NFO, 或 TMDB 上只有一个候选且片名年份完全对上.
+3. 其余交给本机 Claude Code 无头模式识别 (规则见 `arisa-scraper guide`), AI 拿不准的放进「待确认」.
+4. 按映射表生成 `/.arisa/library-*.json.gz` 和 NFO, 生成改名计划.
+5. 待确认和改名在管理网页上处理, 不发通知.
+
+识别结论存在映射表 (fid → TMDB 作品), 本地 `~/.arisa/mapping.json`, 网盘 `/.arisa/mapping.json` 备份.
+给剧集目录做过映射后, 往里加新集数不用再识别. 不开服务时也可以在 Claude Code 里用 `arisa-scrape` skill 手动刮削.
 
 输出模式 (`output`, 可按目录覆盖):
 

@@ -70,6 +70,13 @@ class MappingStore(private val file: File, private val drive: Drive?) {
         return json.decodeFromString(Mapping.serializer(), remote)
     }
 
+    /**
+     * 读-改-写, 加文件锁. 常驻服务、它启动的 AI、网页上的操作可能同时改映射表.
+     */
+    fun update(change: (Mapping) -> Mapping): Mapping = withFileLock(File(file.path + ".lock")) {
+        change(load()).also(::save)
+    }
+
     fun save(mapping: Mapping) {
         file.parentFile.mkdirs()
         val tmp = File(file.path + ".tmp")
@@ -99,4 +106,10 @@ class MappingStore(private val file: File, private val drive: Drive?) {
     companion object {
         const val NAME = "mapping.json"
     }
+}
+
+/** 跨进程的互斥 (同一进程内也互斥). */
+fun <T> withFileLock(lock: File, block: () -> T): T = synchronized(lock.canonicalPath.intern()) {
+    lock.parentFile.mkdirs()
+    java.io.RandomAccessFile(lock, "rw").use { raf -> raf.channel.lock().use { block() } }
 }

@@ -70,12 +70,35 @@ data class RateLimit(
 
 @Serializable
 data class ScanConfig(
-    /** 分钟, daemon 模式下的扫描间隔. */
-    @SerialName("interval_minutes") val intervalMinutes: Int = 30,
-    /** 小时, daemon 定期请求一次夸克, 让登录态 (24 小时有效, 每次请求续期) 不过期. */
-    @SerialName("keepalive_hours") val keepaliveHours: Int = 6,
     /** 保留几个历史索引. */
     @SerialName("keep_indexes") val keepIndexes: Int = 5,
+)
+
+/** 常驻服务里自动识别用的 AI (Claude Code 无头模式). */
+@Serializable
+data class AgentConfig(
+    val enabled: Boolean = true,
+    /** claude 可执行文件. */
+    val command: String = "claude",
+    /** 模型, 为空用 Claude Code 的默认. */
+    val model: String? = null,
+    val effort: String = "low",
+    /** 一次交给 AI 的作品数. */
+    @SerialName("batch_size") val batchSize: Int = 20,
+    /** 单次运行的花费上限 (美元), 超出 Claude Code 会停下. */
+    @SerialName("max_budget_usd") val maxBudgetUsd: Double = 1.0,
+    /** 单次运行的时间上限. */
+    @SerialName("timeout_minutes") val timeoutMinutes: Int = 30,
+)
+
+/** 常驻服务. */
+@Serializable
+data class ServeConfig(
+    val port: Int = 7893,
+    /** 秒, 多久看一次夸克的「最近」. */
+    @SerialName("poll_seconds") val pollSeconds: Int = 90,
+    /** 每天几点全量重扫 (移动、删除在「最近」里看不到). */
+    @SerialName("full_scan_hour") val fullScanHour: Int = 4,
 )
 
 @Serializable
@@ -84,6 +107,8 @@ data class Config(
     val tmdb: TmdbConfig = TmdbConfig(),
     @SerialName("rate_limit") val rateLimit: RateLimit = RateLimit(),
     val scan: ScanConfig = ScanConfig(),
+    val agent: AgentConfig = AgentConfig(),
+    val serve: ServeConfig = ServeConfig(),
     val libraries: List<LibraryConfig> = emptyList(),
 ) {
     /** 合并 defaults 和片库自己的覆盖项. */

@@ -69,6 +69,7 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(Unit) {
             app.library.loadCached()
             app.library.refresh()
+            app.syncProgress(onlyIfDirty = false)
         }
         BackHandler(enabled = stack.size > 1) { stack.removeAt(stack.lastIndex) }
 

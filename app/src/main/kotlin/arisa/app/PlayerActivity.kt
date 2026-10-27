@@ -64,6 +64,7 @@ class PlayerActivity : ComponentActivity() {
         super.onPause()
         session?.saveProgress()
         session?.player?.pause()
+        ArisaApp.instance.syncProgress(onlyIfDirty = true)
     }
 
     override fun onDestroy() {

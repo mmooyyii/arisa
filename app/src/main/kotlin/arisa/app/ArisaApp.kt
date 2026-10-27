@@ -10,6 +10,10 @@ import coil3.memory.MemoryCache
 import coil3.network.okhttp.OkHttpNetworkFetcherFactory
 import coil3.request.crossfade
 import okhttp3.OkHttpClient
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import arisa.app.data.LibraryRepository
 import arisa.app.data.ProgressStore
 import arisa.app.data.SessionStore
@@ -22,6 +26,15 @@ class ArisaApp : Application(), SingletonImageLoader.Factory {
         private set
     lateinit var progress: ProgressStore
         private set
+
+    /** 不跟着页面走的后台任务 (退出播放后同步进度). */
+    val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
+
+    /** 登录了才和网盘同步进度, 演示模式不同步. */
+    fun syncProgress(onlyIfDirty: Boolean) {
+        if (session.demo || !session.isLoggedIn) return
+        scope.launch { if (onlyIfDirty) progress.syncIfDirty(session.client) else progress.sync(session.client) }
+    }
 
     val http: OkHttpClient by lazy {
         OkHttpClient.Builder()

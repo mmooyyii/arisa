@@ -376,9 +376,9 @@ class Service(
         saveWatch(ws.copy(lastSeen = latest, lastRecycled = latestRecycled))
     }
 
-    /** 自己写的 NFO、索引、映射表备份, 它们的增删不用触发扫描. */
+    /** 自己写的 NFO、索引、映射表备份、TV 的观看进度, 它们的增删不用触发扫描. */
     private fun isOwnFile(name: String) =
-        name.endsWith(".nfo", true) || name.startsWith("library-") || name.startsWith("mapping")
+        name.endsWith(".nfo", true) || name.startsWith("library-") || name.startsWith("mapping") || name.startsWith("progress-")
 
     /** 每天在配置的钟点全量扫一次: 移动、删除在「最近」里看不到. */
     fun dailyFullScan() {

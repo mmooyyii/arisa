@@ -41,9 +41,9 @@ class MainActivity : ComponentActivity() {
         setContent {
             ArisaTheme {
                 Box(Modifier.fillMaxSize().background(Palette.Background)) {
-                    val session by app.session.state.collectAsStateWithLifecycle()
+                    val cookie by app.session.cookie.collectAsStateWithLifecycle()
                     var demo by rememberSaveable { mutableStateOf(app.session.demo) }
-                    if (session.refreshToken == null && !demo) {
+                    if (cookie == null && !demo) {
                         LoginScreen(
                             onLoggedIn = { },
                             onDemo = {

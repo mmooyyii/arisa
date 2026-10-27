@@ -3,47 +3,47 @@ package arisa.app.data
 import android.content.Context
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.serialization.json.Json
 import okhttp3.OkHttpClient
-import arisa.quark.QuarkTvClient
+import arisa.quark.QuarkWebClient
 
-/** 夸克 TV 端登录态, 存在 SharedPreferences. */
+/**
+ * 夸克登录态: 网页版扫码拿到的 Cookie, 存在 SharedPreferences.
+ * 用网页接口而不是 TV 接口, 是因为 TV 端登录的设备数有上限.
+ */
 class SessionStore(context: Context, private val http: OkHttpClient) {
     private val prefs = context.getSharedPreferences("session", Context.MODE_PRIVATE)
-    private val json = Json { ignoreUnknownKeys = true }
 
-    private val _state = MutableStateFlow(load())
-    val state: StateFlow<QuarkTvClient.TvSession> = _state
-
-    init {
-        // 设备 ID 要固定下来, 登录绑定在它上面
-        if (!prefs.contains("tv")) save(_state.value)
-    }
+    private val _cookie = MutableStateFlow(prefs.getString("cookie", null))
+    /** 没登录时为 null. */
+    val cookie: StateFlow<String?> = _cookie
 
     /** 演示模式: 不登录, 用内置的片库数据看界面. */
     var demo: Boolean
         get() = prefs.getBoolean("demo", false)
         set(value) = prefs.edit().putBoolean("demo", value).apply()
 
-    val isLoggedIn get() = _state.value.refreshToken != null
+    val isLoggedIn get() = _cookie.value != null
 
-    var client: QuarkTvClient = newClient()
+    var client: QuarkWebClient = newClient()
         private set
 
-    private fun newClient() = QuarkTvClient(_state.value, onSessionChange = ::save, http = http)
+    private fun newClient() = QuarkWebClient(_cookie.value.orEmpty(), onCookieChange = ::save, http = http)
 
-    private fun load(): QuarkTvClient.TvSession =
-        prefs.getString("tv", null)?.let { runCatching { json.decodeFromString(QuarkTvClient.TvSession.serializer(), it) }.getOrNull() }
-            ?: QuarkTvClient.TvSession.newDevice()
+    private fun save(cookie: String?) {
+        prefs.edit().putString("cookie", cookie).apply()
+        _cookie.value = cookie
+    }
 
-    private fun save(s: QuarkTvClient.TvSession) {
-        prefs.edit().putString("tv", json.encodeToString(QuarkTvClient.TvSession.serializer(), s)).apply()
-        _state.value = s
+    /** 扫码拿到 Cookie 后调用. 先请求一次接口, 让服务端下发 __puus (没有它下载会被拒). */
+    fun login(cookie: String) {
+        val c = QuarkWebClient(cookie, onCookieChange = {}, http = http)
+        c.member()
+        client = QuarkWebClient(c.currentCookie, onCookieChange = ::save, http = http)
+        save(c.currentCookie)
     }
 
     fun logout() {
-        val fresh = QuarkTvClient.TvSession(deviceId = _state.value.deviceId)
-        save(fresh)
+        save(null)
         client = newClient()
         demo = false
     }

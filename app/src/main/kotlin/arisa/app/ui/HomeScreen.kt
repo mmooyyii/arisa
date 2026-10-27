@@ -28,6 +28,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -60,7 +61,7 @@ fun HomeScreen(
     val progress by app.progress.all.collectAsStateWithLifecycle()
 
     val lib = library
-    if (lib == null || lib.items.isEmpty()) {
+    if (lib == null || (lib.items.isEmpty() && lib.unmatched.isEmpty())) {
         EmptyState(status, onSettings = onSettings)
         LaunchedEffect(Unit) { app.library.refresh() }
         return
@@ -69,10 +70,13 @@ fun HomeScreen(
     val continueWatching = remember(lib, progress) { app.progress.continueWatching(lib, progress) }
     val shelves = remember(lib) { buildShelves(lib.items) }
 
-    // 焦点停留 300ms 后才切背景, 遥控器连按时不频繁加载大图
-    var focused by remember { mutableStateOf(continueWatching.firstOrNull()?.item ?: lib.items.first()) }
+    // 文字跟着焦点立刻变; 背景大图焦点一到就开始加载, 停留 300ms 后才切:
+    // 遥控器连按时背景不动, 换背景对电视 GPU 是重活
+    var focused by remember { mutableStateOf(continueWatching.firstOrNull()?.item ?: lib.items.firstOrNull()) }
     var hero by remember { mutableStateOf(focused) }
+    val context = LocalContext.current
     LaunchedEffect(focused) {
+        focused?.let { prefetchBackdrop(context, it) }
         delay(300)
         hero = focused
     }
@@ -85,7 +89,7 @@ fun HomeScreen(
 
         Column(Modifier.fillMaxSize()) {
             TopBar(onSearch, onSettings, status)
-            HeroInfo(hero, Modifier.padding(start = 56.dp, end = 56.dp).height(220.dp))
+            focused?.let { HeroInfo(it, Modifier.padding(start = 56.dp, end = 56.dp).height(220.dp)) }
             Spacer(Modifier.height(12.dp))
 
             LazyColumn(
@@ -148,13 +152,33 @@ fun HomeScreen(
                         }
                     }
                 }
+                // 没识别出来的视频按文件名列出来, 照样能播
                 if (lib.unmatched.isNotEmpty()) {
                     item(key = "unmatched") {
-                        Text(
-                            "还有 ${lib.unmatched.size} 个文件没识别出来, 在刮削器的 overrides 里修正后重新扫描即可",
-                            style = MaterialTheme.typography.bodySmall,
-                            modifier = Modifier.padding(start = 56.dp),
-                        )
+                        Column {
+                            SectionTitle("未识别 (${lib.unmatched.size})", Modifier.padding(start = 56.dp))
+                            LazyRow(
+                                contentPadding = PaddingValues(horizontal = 56.dp),
+                                horizontalArrangement = Arrangement.spacedBy(20.dp),
+                            ) {
+                                items(lib.unmatched, key = { it.fid }) { file ->
+                                    val isFirst = continueWatching.isEmpty() && shelves.isEmpty() && file == lib.unmatched.first()
+                                    LandscapeCard(
+                                        imageUrl = null,
+                                        blurHash = null,
+                                        title = file.name,
+                                        subtitle = listOfNotNull(
+                                            file.path.substringBeforeLast('/').substringAfterLast('/').ifEmpty { null },
+                                            file.duration.takeIf { it > 0 }?.let { formatRuntime((it + 30) / 60) },
+                                        ).joinToString("  ·  ").ifEmpty { null },
+                                        progress = progress[file.fid]?.let { it.positionMs.toFloat() / it.durationMs.coerceAtLeast(1) },
+                                        onClick = { onPlay("", file.fid) },
+                                        width = 232.dp,
+                                        modifier = if (isFirst) Modifier.focusRequester(firstFocus) else Modifier,
+                                    )
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -168,8 +192,6 @@ private fun TopBar(onSearch: () -> Unit, onSettings: () -> Unit, status: Library
         Modifier.fillMaxWidth().padding(start = 56.dp, end = 56.dp, top = 28.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        Text("Arisa", style = MaterialTheme.typography.titleMedium, color = Palette.Accent)
-        Spacer(Modifier.width(16.dp))
         if (status is LibraryRepository.Status.Loading) {
             Text("同步中…", style = MaterialTheme.typography.labelSmall)
         }
@@ -227,6 +249,7 @@ private fun EmptyState(status: LibraryRepository.Status, onSettings: () -> Unit)
 }
 
 private fun buildShelves(items: List<MediaItem>): List<Shelf> = buildList {
+    if (items.isEmpty()) return@buildList
     add(Shelf("最近添加", items.sortedByDescending { it.addedAt }.take(20)))
     items.filter { it.type == MediaType.MOVIE }.takeIf { it.isNotEmpty() }?.let { add(Shelf("电影", it.sortedByDescending { m -> m.addedAt })) }
     items.filter { it.type == MediaType.TV }.takeIf { it.isNotEmpty() }?.let { add(Shelf("剧集", it.sortedByDescending { m -> m.addedAt })) }

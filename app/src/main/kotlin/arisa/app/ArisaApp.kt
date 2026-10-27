@@ -41,7 +41,7 @@ class ArisaApp : Application(), SingletonImageLoader.Factory {
     override fun newImageLoader(context: PlatformContext): ImageLoader =
         ImageLoader.Builder(context)
             .components { add(OkHttpNetworkFetcherFactory(callFactory = { http })) }
-            .memoryCache { MemoryCache.Builder().maxSizePercent(context, 0.2).build() }
+            .memoryCache { MemoryCache.Builder().maxSizeBytes(48L * 1024 * 1024).build() }
             .diskCache {
                 DiskCache.Builder()
                     .directory(cacheDir.resolve("images"))

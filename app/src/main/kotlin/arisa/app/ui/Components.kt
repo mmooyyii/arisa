@@ -26,9 +26,11 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -40,10 +42,23 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
-import androidx.tv.material3.Glow
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
+import coil3.PlatformContext
+import android.graphics.Bitmap
+import android.graphics.LinearGradient
+import android.graphics.Paint
+import android.graphics.Shader
+import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.platform.LocalContext
+import coil3.request.transformations
+import coil3.size.Size as CoilSize
+import coil3.transform.Transformation
+import coil3.SingletonImageLoader
 import coil3.compose.AsyncImage
+import coil3.request.ImageRequest
+import coil3.compose.AsyncImagePainter
+import coil3.compose.rememberAsyncImagePainter
 import arisa.library.MediaFile
 import arisa.library.MediaItem
 import arisa.library.MediaType
@@ -59,63 +74,95 @@ fun BlurImage(
     fallback: Color = Palette.Surface,
 ) {
     Box(modifier.background(fallback)) {
-        val placeholder = remember(blurHash) { BlurHashDecoder.decode(blurHash)?.asImageBitmap() }
-        if (placeholder != null) {
-            Image(placeholder, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+        val painter = url?.let { rememberAsyncImagePainter(it) }
+        val loaded = painter?.state?.collectAsState()?.value is AsyncImagePainter.State.Success
+        // 大图出来后就不再画占位图, 少一层全屏绘制 (电视 GPU 弱, 层数多了掉帧)
+        if (!loaded) {
+            val placeholder = remember(blurHash) { BlurHashDecoder.decode(blurHash)?.asImageBitmap() }
+            if (placeholder != null) Image(placeholder, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
         }
-        if (url != null) {
-            AsyncImage(model = url, contentDescription = null, modifier = Modifier.fillMaxSize(), contentScale = contentScale)
-        }
+        if (painter != null) Image(painter, null, Modifier.fillMaxSize(), contentScale = contentScale)
     }
 }
 
 /**
- * 全屏背景: 背景图 + 左侧、底部压暗, 用主色调做一点色偏.
- * 切换时淡入淡出.
+ * 全屏背景: 背景图 + 左侧、底部压暗, 用主色调做一点色偏. 切换时交叉淡入.
+ * 压暗在后台线程画进图片里 (随图片缓存), 屏幕上只有一张图: 电视 GPU 弱, 每帧多画几层全屏就掉帧.
  */
 @Composable
 fun Backdrop(item: MediaItem?, modifier: Modifier = Modifier, dim: Float = 1f) {
+    val context = LocalContext.current
     AnimatedContent(
         targetState = item,
-        transitionSpec = { fadeIn(tween(600)) togetherWith fadeOut(tween(600)) },
+        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
         contentKey = { it?.id },
         modifier = modifier.fillMaxSize(),
         label = "backdrop",
     ) { current ->
-        Box(Modifier.fillMaxSize().background(Palette.Background)) {
+        Box(Modifier.fillMaxSize()) {
             if (current != null) {
                 val tint = parseColor(current.art.color, Palette.Background)
-                BlurImage(
-                    url = tmdbImage(current.backdrop, "w1280"),
-                    blurHash = current.art.backdropBlurHash,
-                    modifier = Modifier.fillMaxSize(),
-                    fallback = tint,
-                )
-                // 左侧压暗, 留给文字
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.horizontalGradient(
-                            0f to Palette.Background.copy(alpha = 0.95f * dim),
-                            0.45f to Palette.Background.copy(alpha = 0.55f * dim),
-                            0.75f to Color.Transparent,
-                        )
-                    )
-                )
-                // 底部压暗, 带一点主色
-                Box(
-                    Modifier.fillMaxSize().background(
-                        Brush.verticalGradient(
-                            0f to Color.Transparent,
-                            0.45f to tint.copy(alpha = 0.15f * dim),
-                            0.75f to Palette.Background.copy(alpha = 0.92f * dim),
-                            1f to Palette.Background,
-                        )
-                    )
-                )
+                val painter = rememberAsyncImagePainter(remember(current.id, dim) { backdropRequest(context, current, dim) })
+                val loaded = painter.state.collectAsState().value is AsyncImagePainter.State.Success
+                if (!loaded) {
+                    // 大图出来前的一小会儿: BlurHash 占位, 压暗现场画
+                    BlurImage(null, current.art.backdropBlurHash, Modifier.fillMaxSize(), fallback = tint)
+                    Box(Modifier.fillMaxSize().drawWithCache {
+                        val (left, bottom) = dimStops(tint, dim)
+                        val l = Brush.horizontalGradient(*left.toTypedArray())
+                        val b = Brush.verticalGradient(*bottom.toTypedArray())
+                        onDrawBehind { drawRect(l); drawRect(b) }
+                    })
+                }
+                Image(painter, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
             }
         }
     }
 }
+
+/** 左侧压暗留给文字, 底部压暗带一点主色. */
+private fun dimStops(tint: Color, dim: Float) = listOf(
+    0f to Palette.Background.copy(alpha = 0.95f * dim),
+    0.45f to Palette.Background.copy(alpha = 0.55f * dim),
+    0.75f to Color.Transparent,
+) to listOf(
+    0f to Color.Transparent,
+    0.45f to tint.copy(alpha = 0.15f * dim),
+    0.75f to Palette.Background.copy(alpha = 0.92f * dim),
+    1f to Palette.Background,
+)
+
+/** 把压暗渐变画进背景图. */
+private class DimTransformation(private val tint: Color, private val dim: Float) : Transformation() {
+    override val cacheKey = "dim-${tint.toArgb()}-$dim"
+
+    override suspend fun transform(input: Bitmap, size: CoilSize): Bitmap {
+        val out = input.copy(Bitmap.Config.ARGB_8888, true)
+        val canvas = android.graphics.Canvas(out)
+        val w = out.width.toFloat()
+        val h = out.height.toFloat()
+        val (left, bottom) = dimStops(tint, dim)
+        fun shader(stops: List<Pair<Float, Color>>, x1: Float, y1: Float) = LinearGradient(
+            0f, 0f, x1, y1,
+            stops.map { it.second.toArgb() }.toIntArray(), stops.map { it.first }.toFloatArray(), Shader.TileMode.CLAMP,
+        )
+        val paint = Paint()
+        paint.shader = shader(left, w, 0f)
+        canvas.drawRect(0f, 0f, w, h, paint)
+        paint.shader = shader(bottom, 0f, h)
+        canvas.drawRect(0f, 0f, w, h, paint)
+        // 转成硬件位图, 只在显存里存一份 (普通位图画的时候还要再传一份到 GPU)
+        return out.copy(Bitmap.Config.HARDWARE, false)?.also { out.recycle() } ?: out
+    }
+}
+
+/** 固定尺寸, 预加载和显示用同一个缓存条目. */
+private fun backdropRequest(context: PlatformContext, item: MediaItem, dim: Float) =
+    ImageRequest.Builder(context)
+        .data(tmdbImage(item.backdrop, BACKDROP_SIZE))
+        .size(1280, 720)
+        .transformations(DimTransformation(parseColor(item.art.color, Palette.Background), dim))
+        .build()
 
 /** 有 Logo 图就显示 Logo, 没有就用文字标题. */
 @Composable
@@ -186,8 +233,6 @@ private fun focusBorder() = CardDefaults.border(
     focusedBorder = Border(BorderStroke(2.dp, Palette.Focus), shape = RoundedCornerShape(10.dp)),
 )
 
-@Composable
-private fun focusGlow() = CardDefaults.glow(focusedGlow = Glow(elevationColor = Color.Black.copy(alpha = 0.6f), elevation = 16.dp))
 
 /** 竖版海报卡片. */
 @Composable
@@ -198,7 +243,6 @@ fun PosterCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifi
         shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
         scale = CardDefaults.scale(focusedScale = 1.08f),
         border = focusBorder(),
-        glow = focusGlow(),
     ) {
         BlurImage(
             url = tmdbImage(item.poster, "w342"),
@@ -234,8 +278,7 @@ fun LandscapeCard(
             shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
             scale = CardDefaults.scale(focusedScale = 1.05f),
             border = focusBorder(),
-            glow = focusGlow(),
-        ) {
+            ) {
             Box(Modifier.fillMaxSize()) {
                 BlurImage(imageUrl, blurHash, Modifier.fillMaxSize(), fallback = fallback)
                 if (progress != null) ProgressBar(progress)
@@ -285,4 +328,12 @@ val MinimalBringIntoView = object : BringIntoViewSpec {
             else -> trailing - containerSize
         }
     }
+}
+
+private const val BACKDROP_SIZE = "w1280"
+
+/** 提前下载、处理好背景图放进缓存, 切过去时直接显示. */
+fun prefetchBackdrop(context: PlatformContext, item: MediaItem, dim: Float = 1f) {
+    if (item.backdrop == null) return
+    SingletonImageLoader.get(context).enqueue(backdropRequest(context, item, dim))
 }

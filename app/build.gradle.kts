@@ -19,7 +19,9 @@ android {
 
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
+            isShrinkResources = true
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
             signingConfig = signingConfigs.getByName("debug")
         }
     }
@@ -53,10 +55,15 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.4")
 
     implementation("io.coil-kt.coil3:coil-compose:3.3.0")
+    // 网页版扫码登录只给链接, 二维码自己画
+    implementation("com.google.zxing:core:3.5.3")
     implementation("io.coil-kt.coil3:coil-network-okhttp:3.3.0")
 
     val media3 = "1.8.0"
     implementation("androidx.media3:media3-exoplayer:$media3")
     implementation("androidx.media3:media3-datasource-okhttp:$media3")
     implementation("androidx.media3:media3-ui:$media3")
+    implementation("androidx.media3:media3-exoplayer-hls:$media3")
+    // FFmpeg 音频解码 (TrueHD / DTS / AC3 等), 设备解不了又不能直通时用. 官方没发 Maven, 用 Jellyfin 打包的, 版本跟 media3 对齐
+    implementation("org.jellyfin.media3:media3-ffmpeg-decoder:$media3+1")
 }

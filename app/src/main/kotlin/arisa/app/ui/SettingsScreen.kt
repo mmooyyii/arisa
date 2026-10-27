@@ -35,8 +35,22 @@ object Settings {
     private fun prefs(context: Context) = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
     /** true: 播夸克转码后的流 (省流量, 非会员也流畅); false: 播原文件. */
-    fun transcoded(context: Context) = prefs(context).getBoolean("transcoded", false)
-    fun setTranscoded(context: Context, value: Boolean) = prefs(context).edit().putBoolean("transcoded", value).apply()
+
+    /** 默认打开中文字幕; false 时默认不开字幕 (每部作品选过的以选过的为准). */
+    fun subtitlesOn(context: Context) = prefs(context).getBoolean("subtitles_on", true)
+    fun setSubtitlesOn(context: Context, value: Boolean) = prefs(context).edit().putBoolean("subtitles_on", value).apply()
+
+    val SUBTITLE_SIZES = listOf("小" to 0.8f, "中" to 1.0f, "大" to 1.25f, "特大" to 1.5f)
+    fun subtitleSize(context: Context) = prefs(context).getInt("subtitle_size", 1).coerceIn(SUBTITLE_SIZES.indices)
+    fun setSubtitleSize(context: Context, value: Int) = prefs(context).edit().putInt("subtitle_size", value).apply()
+
+    /** 字幕样式: false 白字黑边, true 白字半透明黑底. */
+    fun subtitleBackground(context: Context) = prefs(context).getBoolean("subtitle_background", false)
+    fun setSubtitleBackground(context: Context, value: Boolean) = prefs(context).edit().putBoolean("subtitle_background", value).apply()
+
+    /** 播放时把电视刷新率切到和片源帧率一致 (24p 片源切 24Hz), 避免画面抖动. */
+    fun matchFrameRate(context: Context) = prefs(context).getBoolean("match_frame_rate", false)
+    fun setMatchFrameRate(context: Context, value: Boolean) = prefs(context).edit().putBoolean("match_frame_rate", value).apply()
 }
 
 @Composable
@@ -45,7 +59,9 @@ fun SettingsScreen(onLogout: () -> Unit) {
     val scope = rememberCoroutineScope()
     val library by app.library.library.collectAsStateWithLifecycle()
     val status by app.library.status.collectAsStateWithLifecycle()
-    var transcoded by remember { mutableStateOf(Settings.transcoded(app)) }
+    var subtitlesOn by remember { mutableStateOf(Settings.subtitlesOn(app)) }
+    var subtitleSize by remember { mutableStateOf(Settings.subtitleSize(app)) }
+    var matchFrameRate by remember { mutableStateOf(Settings.matchFrameRate(app)) }
     val first = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { first.requestFocus() } }
 
@@ -72,12 +88,31 @@ fun SettingsScreen(onLogout: () -> Unit) {
             ListItem(
                 selected = false,
                 onClick = {
-                    transcoded = !transcoded
-                    Settings.setTranscoded(app, transcoded)
+                    subtitlesOn = !subtitlesOn
+                    Settings.setSubtitlesOn(app, subtitlesOn)
                 },
-                headlineContent = { Text("播放夸克转码版本") },
-                supportingContent = { Text(if (transcoded) "播放转码流, 码率低但更流畅" else "播放原文件, 画质最好 (非会员可能限速)") },
-                trailingContent = { Switch(checked = transcoded, onCheckedChange = null) },
+                headlineContent = { Text("默认打开字幕") },
+                supportingContent = { Text(if (subtitlesOn) "优先中文字幕; 每部作品会记住你选过的音轨和字幕" else "默认不开字幕") },
+                trailingContent = { Switch(checked = subtitlesOn, onCheckedChange = null) },
+            )
+            ListItem(
+                selected = false,
+                onClick = {
+                    subtitleSize = (subtitleSize + 1) % Settings.SUBTITLE_SIZES.size
+                    Settings.setSubtitleSize(app, subtitleSize)
+                },
+                headlineContent = { Text("字幕大小") },
+                trailingContent = { Text(Settings.SUBTITLE_SIZES[subtitleSize].first) },
+            )
+            ListItem(
+                selected = false,
+                onClick = {
+                    matchFrameRate = !matchFrameRate
+                    Settings.setMatchFrameRate(app, matchFrameRate)
+                },
+                headlineContent = { Text("自动切换刷新率") },
+                supportingContent = { Text("播放时把电视切到和片源一样的帧率 (如 24Hz), 切换时会黑屏一两秒") },
+                trailingContent = { Switch(checked = matchFrameRate, onCheckedChange = null) },
             )
             ListItem(
                 selected = false,

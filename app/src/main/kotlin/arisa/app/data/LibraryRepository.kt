@@ -13,9 +13,14 @@ import arisa.library.Library
 import arisa.library.LibraryCodec
 import arisa.library.MediaFile
 import arisa.library.MediaItem
+import arisa.library.SubtitleFile
+import arisa.quark.QuarkFile
 import arisa.quark.QuarkLink
-import arisa.quark.QuarkTvClient
+import arisa.quark.QuarkWebClient
 import java.io.File
+import java.nio.ByteBuffer
+import java.nio.charset.Charset
+import java.nio.charset.CodingErrorAction
 
 /**
  * 片库: 读 mac mini 写进夸克的 /.arisa/library-*.json.gz.
@@ -36,6 +41,8 @@ class LibraryRepository(
 
     private val cacheFile = File(context.filesDir, "library.json.gz")
     private val cacheNameFile = File(context.filesDir, "library.name")
+    /** /.arisa 目录的 fid, 省得每次刷新都列一遍网盘根目录. */
+    private val dirFidFile = File(context.filesDir, "library.dir")
     private val mutex = Mutex()
 
     private val _library = MutableStateFlow<Library?>(null)
@@ -63,8 +70,7 @@ class LibraryRepository(
             _status.value = Status.Loading
             _status.value = try {
                 val client = session.client
-                val dir = client.list(QuarkTvClient.ROOT).firstOrNull { it.isDir && it.name == LibraryCodec.DIR }
-                val files = dir?.let { client.list(it.fid) }.orEmpty()
+                val files = indexFiles(client)
                 val latest = LibraryCodec.latest(files.map { it.name })
                 if (latest == null) {
                     Status.NoIndex
@@ -85,35 +91,78 @@ class LibraryRepository(
         }
     }
 
+    /**
+     * 列出 /.arisa 里的文件. 先用缓存的目录 fid, 列不出索引 (目录被删、重建) 时再从根目录找一遍.
+     */
+    private fun indexFiles(client: QuarkWebClient): List<QuarkFile> {
+        dirFidFile.takeIf { it.exists() }?.readText()?.let { fid ->
+            val files = runCatching { client.list(fid) }.getOrNull()
+            if (files != null && LibraryCodec.latest(files.map { it.name }) != null) return files
+        }
+        val dir = client.list(QuarkWebClient.ROOT).firstOrNull { it.isDir && it.name == LibraryCodec.DIR }
+            ?: return emptyList<QuarkFile>().also { dirFidFile.delete() }
+        dirFidFile.writeText(dir.fid)
+        return client.list(dir.fid)
+    }
+
     fun clear() {
         cacheFile.delete()
         cacheNameFile.delete()
+        dirFidFile.delete()
         _library.value = null
     }
 
     fun item(id: String): MediaItem? = _library.value?.items?.firstOrNull { it.id == id }
 
-    /** 播放用的直链, 每次播放前现取 (直链会过期). */
-    suspend fun playLink(file: MediaFile, transcoded: Boolean): QuarkLink = withContext(Dispatchers.IO) {
+    /** 没识别出来的视频, 不属于任何作品, 按 fid 找. */
+    fun unmatchedFile(fid: String): MediaFile? = _library.value?.unmatched?.firstOrNull { it.fid == fid }
+
+    /** 播放用的原文件直链 (要带 Cookie), 每次播放前现取 (直链会过期). */
+    suspend fun playLink(file: MediaFile): QuarkLink = withContext(Dispatchers.IO) {
         if (session.demo) return@withContext QuarkLink(DEMO_VIDEO)
-        val client = session.client
-        if (transcoded) {
-            val best = client.streamingLinks(file.fid).maxByOrNull { it.width * it.height }
-            if (best != null) return@withContext QuarkLink(best.url, mapOf("User-Agent" to QuarkTvClient.USER_AGENT))
+        session.client.downloadLink(file.fid)
+    }
+
+    /**
+     * 外挂字幕下载到本地缓存, 统一转成 UTF-8 (中文字幕常是 GBK / Big5, 播放器只认 UTF-8).
+     */
+    suspend fun subtitle(sub: SubtitleFile): File = withContext(Dispatchers.IO) {
+        val dir = File(context.cacheDir, "subtitles").apply { mkdirs() }
+        val out = File(dir, sub.fid + "." + sub.name.substringAfterLast('.', "srt").lowercase())
+        if (out.exists()) return@withContext out
+        val text = decodeText(fetch(session.client.downloadLink(sub.fid)), sub.language)
+        val tmp = File(dir, out.name + ".tmp")
+        tmp.writeText(text)
+        tmp.renameTo(out)
+        out
+    }
+
+    private fun decodeText(bytes: ByteArray, language: String?): String {
+        fun strict(charset: Charset) = runCatching {
+            charset.newDecoder()
+                .onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT)
+                .decode(ByteBuffer.wrap(bytes)).toString()
+        }.getOrNull()
+        if (bytes.size >= 2 && (bytes[0] == 0xFF.toByte() && bytes[1] == 0xFE.toByte() || bytes[0] == 0xFE.toByte() && bytes[1] == 0xFF.toByte())) {
+            return String(bytes, Charsets.UTF_16)
         }
-        client.downloadLink(file.fid)
+        return (strict(Charsets.UTF_8)
+            ?: (if (language == "zh-Hant") strict(Charset.forName("Big5")) else null)
+            ?: strict(Charset.forName("GB18030"))
+            ?: String(bytes, Charsets.UTF_8)).removePrefix("\uFEFF")
     }
 
     private fun fetch(link: QuarkLink): ByteArray {
         val req = Request.Builder().url(link.url).apply { link.headers.forEach { (k, v) -> header(k, v) } }.build()
         return http.newCall(req).execute().use { resp ->
-            check(resp.isSuccessful) { "下载索引失败 ${resp.code}" }
+            check(resp.isSuccessful) { "下载失败 ${resp.code}" }
             resp.body!!.bytes()
         }
     }
 
     companion object {
         /** 演示模式下所有片子都播这个. */
-        const val DEMO_VIDEO = "https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4"
+        const val DEMO_VIDEO = "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4"
     }
 }

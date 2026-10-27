@@ -1,7 +1,6 @@
 package arisa.app.ui
 
-import android.graphics.BitmapFactory
-import android.util.Base64
+import android.graphics.Bitmap
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
@@ -29,6 +28,7 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.FilterQuality
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.unit.dp
@@ -40,6 +40,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.withContext
 import arisa.app.ArisaApp
+import arisa.quark.QuarkWebLogin
+import com.google.zxing.BarcodeFormat
+import com.google.zxing.EncodeHintType
+import com.google.zxing.qrcode.QRCodeWriter
 
 /** 扫码登录夸克. 二维码 5 分钟内有效, 过期自动换新. */
 @Composable
@@ -54,24 +58,25 @@ fun LoginScreen(onLoggedIn: () -> Unit, onDemo: () -> Unit) {
     LaunchedEffect(generation) {
         error = null
         qr = null
+        val web = QuarkWebLogin(app.http)
         val login = try {
-            withContext(Dispatchers.IO) { app.session.client.startQrLogin() }
+            withContext(Dispatchers.IO) { web.start() }
         } catch (e: Exception) {
             error = "获取二维码失败: ${e.message}"
             return@LaunchedEffect
         }
-        qr = runCatching {
-            val bytes = Base64.decode(login.qrJpegBase64.substringAfter("base64,"), Base64.DEFAULT)
-            BitmapFactory.decodeByteArray(bytes, 0, bytes.size).asImageBitmap()
-        }.getOrNull()
+        qr = qrBitmap(login.qrContent)
         val deadline = System.currentTimeMillis() + 5 * 60_000
         while (System.currentTimeMillis() < deadline) {
             delay(2000)
-            val ok = withContext(Dispatchers.IO) { runCatching { app.session.client.pollLogin(login.queryToken) }.getOrDefault(false) }
-            if (ok) {
+            val cookie = withContext(Dispatchers.IO) { runCatching { web.poll(login.token) }.getOrNull() } ?: continue
+            try {
+                withContext(Dispatchers.IO) { app.session.login(cookie) }
                 onLoggedIn()
-                return@LaunchedEffect
+            } catch (e: Exception) {
+                error = "登录失败: ${e.message}"
             }
+            return@LaunchedEffect
         }
         generation++
     }
@@ -106,9 +111,15 @@ fun LoginScreen(onLoggedIn: () -> Unit, onDemo: () -> Unit) {
                 Modifier.size(300.dp).clip(RoundedCornerShape(16.dp)).background(Color.White).padding(16.dp),
                 contentAlignment = Alignment.Center,
             ) {
-                qr?.let { Image(it, contentDescription = "登录二维码", modifier = Modifier.fillMaxSize()) }
+                qr?.let { Image(it, contentDescription = "登录二维码", modifier = Modifier.fillMaxSize(), filterQuality = FilterQuality.None) }
                     ?: Text(if (error == null) "加载中…" else "加载失败", color = Color.Gray)
             }
         }
     }
+}
+
+private fun qrBitmap(content: String): ImageBitmap {
+    val m = QRCodeWriter().encode(content, BarcodeFormat.QR_CODE, 0, 0, mapOf(EncodeHintType.MARGIN to 0))
+    val pixels = IntArray(m.width * m.height) { i -> if (m.get(i % m.width, i / m.width)) 0xFF000000.toInt() else 0xFFFFFFFF.toInt() }
+    return Bitmap.createBitmap(pixels, m.width, m.height, Bitmap.Config.ARGB_8888).asImageBitmap()
 }

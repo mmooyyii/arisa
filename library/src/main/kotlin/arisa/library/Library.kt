@@ -70,6 +70,8 @@ data class MediaItem(
     val logo: String? = null,
     val art: Artwork = Artwork(),
     val cast: List<CastMember> = emptyList(),
+    /** 电影的导演; 剧集没有固定导演, 用 TMDB 的主创 (created_by). */
+    val directors: List<String> = emptyList(),
     /** 电影的文件 (可能有多个版本). */
     val files: List<MediaFile> = emptyList(),
     /** 剧集的季. */

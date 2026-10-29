@@ -182,6 +182,7 @@ class Tmdb(
         @SerialName("imdb_id") val imdbId: String? = null,
         @SerialName("external_ids") val externalIds: ExternalIds? = null,
         val credits: Credits? = null,
+        @SerialName("created_by") val createdBy: List<Creator> = emptyList(),
         val images: Images? = null,
         val seasons: List<SeasonSummary> = emptyList(),
         @SerialName("release_dates") val releaseDates: ReleaseDates? = null,
@@ -201,7 +202,13 @@ class Tmdb(
     data class ExternalIds(@SerialName("imdb_id") val imdbId: String? = null)
 
     @Serializable
-    data class Credits(val cast: List<Cast> = emptyList())
+    data class Credits(val cast: List<Cast> = emptyList(), val crew: List<Crew> = emptyList())
+
+    @Serializable
+    data class Crew(val name: String, val job: String? = null)
+
+    @Serializable
+    data class Creator(val name: String)
 
     @Serializable
     data class Cast(

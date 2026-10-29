@@ -485,6 +485,8 @@ class Scraper(
                 backdropBlurHash = backdropInfo?.blurHash,
             ),
             cast = d.credits?.cast.orEmpty().take(15).map { CastMember(it.name, it.character?.takeIf(String::isNotBlank), it.profilePath) },
+            directors = if (kind == MediaType.MOVIE) d.credits?.crew.orEmpty().filter { it.job == "Director" }.map { it.name }.distinct()
+            else d.createdBy.map { it.name },
             addedAt = files.minOf { it.file.updatedAt },
             match = MatchInfo(source, 1.0),
         )

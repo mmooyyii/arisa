@@ -14,4 +14,9 @@ kotlin {
 
 dependencies {
     api("org.jetbrains.kotlinx:kotlinx-serialization-json:1.9.0")
+    // 搜索用的汉字转拼音, 纯 Java, 安卓低版本也能用
+    implementation("com.belerweb:pinyin4j:2.5.1")
+    testImplementation(kotlin("test"))
 }
+
+tasks.test { useJUnitPlatform() }

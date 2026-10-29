@@ -102,7 +102,12 @@ class MainActivity : ComponentActivity() {
                 onSearch = { stack += Screen.Search(it) },
             )
             is Screen.Collection -> CollectionScreen(screen.id, onOpen = { stack += Screen.Detail(it) })
-            is Screen.Search -> SearchScreen(screen.query, onOpen = { stack += Screen.Detail(it) })
+            is Screen.Search -> SearchScreen(
+                screen.query,
+                onOpen = { stack += Screen.Detail(it) },
+                onOpenCollection = { stack += Screen.Collection(it) },
+                onPlay = { fid -> play("", fid, false) },
+            )
             Screen.Settings -> SettingsScreen(onLogout = onLogout)
         } }
     }

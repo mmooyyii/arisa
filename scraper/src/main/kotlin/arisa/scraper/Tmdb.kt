@@ -60,9 +60,9 @@ class Tmdb(
         get("/search/tv", mapOf("query" to query, "language" to language) + optional("first_air_date_year", year))
             .let { json.decodeFromString(SearchPage.serializer(), it).results }
 
-    override fun movie(id: Int, language: String): Details = details("/movie/$id", language, "credits,images,external_ids,release_dates")
+    override fun movie(id: Int, language: String): Details = details("/movie/$id", language, "credits,images,external_ids,release_dates,alternative_titles")
 
-    override fun tv(id: Int, language: String): Details = details("/tv/$id", language, "credits,images,external_ids,content_ratings")
+    override fun tv(id: Int, language: String): Details = details("/tv/$id", language, "credits,images,external_ids,content_ratings,alternative_titles")
 
     override fun season(tvId: Int, number: Int, language: String): SeasonDetails =
         get("/tv/$tvId/season/$number", mapOf("language" to language))
@@ -183,6 +183,7 @@ class Tmdb(
         @SerialName("external_ids") val externalIds: ExternalIds? = null,
         val credits: Credits? = null,
         @SerialName("created_by") val createdBy: List<Creator> = emptyList(),
+        @SerialName("alternative_titles") val alternativeTitles: AlternativeTitles? = null,
         val images: Images? = null,
         val seasons: List<SeasonSummary> = emptyList(),
         @SerialName("release_dates") val releaseDates: ReleaseDates? = null,
@@ -209,6 +210,15 @@ class Tmdb(
 
     @Serializable
     data class Creator(val name: String)
+
+    /** 电影放在 titles, 剧集放在 results. */
+    @Serializable
+    data class AlternativeTitles(val titles: List<AlternativeTitle> = emptyList(), val results: List<AlternativeTitle> = emptyList()) {
+        val all get() = titles + results
+    }
+
+    @Serializable
+    data class AlternativeTitle(@SerialName("iso_3166_1") val country: String = "", val title: String = "")
 
     @Serializable
     data class Cast(

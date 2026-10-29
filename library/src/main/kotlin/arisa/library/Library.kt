@@ -21,6 +21,12 @@ data class Library(
     val unmatched: List<MediaFile> = emptyList(),
     /** 合集: 同一个顶层目录里的多部作品, TV 首页合成一张卡片. */
     val collections: List<MediaCollection> = emptyList(),
+    /**
+     * 搜索用的拼音, 刮削时生成: 名字 (片名、原名、合集名、演员、导演、类型) → 逐字读音.
+     * 名字去掉空格标点后每个字一项, 用空格分开; 多音字的几个读音用 | 隔开, 非汉字原样.
+     * 如 "长安3" → "chang|zhang an 3". 只收含汉字的名字, 见 [LibrarySearch].
+     */
+    val pinyin: Map<String, String> = emptyMap(),
 ) {
     companion object {
         const val SCHEMA = 1
@@ -56,6 +62,8 @@ data class MediaItem(
     val bangumiId: Int? = null,
     val title: String,
     val originalTitle: String? = null,
+    /** 别名 (其他地区的译名、英文名、旧译名), 只用来搜索. */
+    val aliases: List<String> = emptyList(),
     val year: Int? = null,
     val overview: String? = null,
     val genres: List<String> = emptyList(),

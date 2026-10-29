@@ -18,6 +18,8 @@ dependencies {
     implementation("com.charleskorn.kaml:kaml:0.104.0")
     // 扫码登录时在终端里画二维码
     implementation("com.google.zxing:core:3.5.3")
+    // 生成索引里搜索用的拼音
+    implementation("com.belerweb:pinyin4j:2.5.1")
     testImplementation(kotlin("test"))
 }
 

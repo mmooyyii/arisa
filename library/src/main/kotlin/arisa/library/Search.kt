@@ -1,15 +1,9 @@
 package arisa.library
 
-import net.sourceforge.pinyin4j.PinyinHelper
-import net.sourceforge.pinyin4j.format.HanyuPinyinCaseType
-import net.sourceforge.pinyin4j.format.HanyuPinyinOutputFormat
-import net.sourceforge.pinyin4j.format.HanyuPinyinToneType
-import net.sourceforge.pinyin4j.format.HanyuPinyinVCharType
-
 /**
- * 片库搜索. 片名、原名、合集名、演员、导演、类型都能用汉字或拼音搜:
+ * 片库搜索. 片名、原名、别名、合集名、演员、导演、类型都能用汉字或拼音搜:
  * 全拼 (liulangdiqiu)、首字母 (lldq)、混着打 (liulangdq) 都行; 年份和未识别文件名按文字搜.
- * 建索引要查拼音表, 在后台线程建一次, 之后每次搜索只做匹配.
+ * 拼音是刮削时写进 [Library.pinyin] 的, 这里只做匹配.
  */
 class LibrarySearch(library: Library) {
     sealed interface Hit {
@@ -25,16 +19,18 @@ class LibrarySearch(library: Library) {
     private val entries: List<Entry>
 
     init {
+        fun text(raw: String) = Text(raw, library.pinyin[raw])
         val byId = library.items.associateBy { it.id }
         val items = library.items.map { item ->
             Entry(
                 hit = { Hit.Item(item, it) },
                 fields = buildList {
-                    add(Field(Text(item.title), TITLE))
-                    item.originalTitle?.let { add(Field(Text(it), ORIGINAL)) }
-                    item.directors.forEach { add(Field(Text(it), PERSON)) }
-                    item.cast.forEach { add(Field(Text(it.name), PERSON - 5)) }
-                    item.genres.forEach { add(Field(Text(it), GENRE)) }
+                    add(Field(text(item.title), TITLE))
+                    item.originalTitle?.let { add(Field(text(it), ORIGINAL)) }
+                    item.aliases.forEach { add(Field(text(it), ALIAS)) }
+                    item.directors.forEach { add(Field(text(it), PERSON)) }
+                    item.cast.forEach { add(Field(text(it.name), PERSON - 5)) }
+                    item.genres.forEach { add(Field(text(it), GENRE)) }
                 },
                 year = item.year,
                 addedAt = item.addedAt,
@@ -43,11 +39,10 @@ class LibrarySearch(library: Library) {
         val collections = library.collections.mapNotNull { c ->
             val members = c.items.mapNotNull(byId::get)
             val cover = byId[c.cover] ?: members.firstOrNull() ?: return@mapNotNull null
-            Entry({ Hit.Collection(c, cover, it) }, listOf(Field(Text(c.name), TITLE)), null, members.maxOf { it.addedAt })
+            Entry({ Hit.Collection(c, cover, it) }, listOf(Field(text(c.name), TITLE)), null, members.maxOf { it.addedAt })
         }
-        // 文件名里多是英文和点号, 不算拼音
         val files = library.unmatched.map { f ->
-            Entry({ Hit.File(f, it) }, listOf(Field(Text(f.name, pinyin = false), FILE)), null, f.updatedAt)
+            Entry({ Hit.File(f, it) }, listOf(Field(Text(f.name, null), FILE)), null, f.updatedAt)
         }
         entries = items + collections + files
     }
@@ -67,14 +62,11 @@ class LibrarySearch(library: Library) {
             .map { (e, score) -> e.hit(score) }
     }
 
-    /**
-     * 一段可搜索的文字. 去掉空格标点后逐字记下可选的读法: 汉字是它的各个拼音 (多音字有好几个), 其他字符是自己.
-     */
-    internal class Text(raw: String, pinyin: Boolean = true) {
+    /** 一段可搜索的文字. [pinyin] 是 [Library.pinyin] 里它的读音, 对不上字数就当没有. */
+    internal class Text(raw: String, pinyin: String?) {
         private val plain = normalize(raw)
         private val readings: List<List<String>>? =
-            if (pinyin && plain.any(::isHan)) plain.map { c -> if (isHan(c)) Pinyin.of(c).ifEmpty { listOf(c.toString()) } else listOf(c.toString()) }
-            else null
+            pinyin?.split(' ')?.map { it.split('|') }?.takeIf { it.size == plain.length }
 
         /** 0 是没命中; 越大越相关: 完全一样 > 开头 > 包含 > 拼音开头 > 拼音包含. */
         fun match(q: String): Int = when {
@@ -108,32 +100,32 @@ class LibrarySearch(library: Library) {
         }
     }
 
-    internal object Pinyin {
-        private val format = HanyuPinyinOutputFormat().apply {
-            toneType = HanyuPinyinToneType.WITHOUT_TONE
-            vCharType = HanyuPinyinVCharType.WITH_V
-            caseType = HanyuPinyinCaseType.LOWERCASE
-        }
-        private val cache = HashMap<Char, List<String>>()
-
-        @Synchronized
-        fun of(c: Char): List<String> = cache.getOrPut(c) {
-            PinyinHelper.toHanyuPinyinStringArray(c, format)?.distinct().orEmpty()
-        }
-    }
-
     companion object {
         private const val TITLE = 100
         private const val ORIGINAL = 90
+        private const val ALIAS = 85
         private const val PERSON = 60
         private const val GENRE = 50
         private const val YEAR = 70
         private const val FILE = 40
 
-        private fun isHan(c: Char) = Character.UnicodeScript.of(c.code) == Character.UnicodeScript.HAN
+        fun isHan(c: Char) = Character.UnicodeScript.of(c.code) == Character.UnicodeScript.HAN
+
+        /** 要生成拼音的名字: 能搜的名字里含汉字的. 刮削器按这个写 [Library.pinyin]. */
+        fun names(library: Library): Set<String> = buildSet {
+            for (item in library.items) {
+                add(item.title)
+                item.originalTitle?.let(::add)
+                addAll(item.aliases)
+                addAll(item.directors)
+                item.cast.mapTo(this) { it.name }
+                addAll(item.genres)
+            }
+            library.collections.mapTo(this) { it.name }
+        }.filter { name -> name.any(::isHan) }.toSet()
 
         /** 小写, 去掉空格和标点 (中英文都算), 「蜘蛛侠：英雄归来」和「蜘蛛侠 英雄归来」一样. */
-        internal fun normalize(s: String) = buildString {
+        fun normalize(s: String) = buildString {
             for (c in s.lowercase()) if (Character.isLetterOrDigit(c)) append(c)
         }
     }

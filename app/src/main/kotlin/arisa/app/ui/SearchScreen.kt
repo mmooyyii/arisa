@@ -22,7 +22,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -39,10 +38,8 @@ import androidx.tv.material3.Text
 import arisa.app.ArisaApp
 import arisa.library.LibrarySearch
 import arisa.library.LibrarySearch.Hit
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
 
-/** 按片名、原名、合集名、演员、导演、类型、年份搜, 支持拼音和首字母; 也能搜到未识别的文件. */
+/** 按片名、原名、别名、合集名、演员、导演、类型、年份搜, 支持拼音和首字母; 也能搜到未识别的文件. */
 @Composable
 fun SearchScreen(
     initialQuery: String = "",
@@ -57,10 +54,7 @@ fun SearchScreen(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
-    // 建索引要查拼音表, 放后台
-    val index by produceState<LibrarySearch?>(null, library) {
-        value = library?.let { withContext(Dispatchers.Default) { LibrarySearch(it) } }
-    }
+    val index = remember(library) { library?.let(::LibrarySearch) }
     val items = library?.items.orEmpty()
     val results = remember(query, items, index) {
         if (query.isBlank()) items.sortedByDescending { it.addedAt }.map { Hit.Item(it, 0) }
@@ -77,7 +71,7 @@ fun SearchScreen(
                 .border(2.dp, if (inputFocused) Palette.Focus else Color.Transparent, RoundedCornerShape(10.dp))
                 .padding(horizontal = 16.dp, vertical = 12.dp)
         ) {
-            if (query.isEmpty()) Text("片名、演员、导演、类型, 可以打拼音首字母", style = MaterialTheme.typography.bodyMedium, color = Palette.TextTertiary)
+            if (query.isEmpty()) Text("片名、别名、演员、导演、类型, 可以打拼音首字母", style = MaterialTheme.typography.bodyMedium, color = Palette.TextTertiary)
             BasicTextField(
                 value = query,
                 onValueChange = { query = it },

@@ -364,7 +364,7 @@ class Scraper(
 
         val previous = runCatching { loadLatestIndex() }.getOrNull()
         val collections = collections(items, filesOf)
-        val library = Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched, collections = collections)
+        val library = Pinyin.annotate(Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched, collections = collections))
         log("${items.size} 部作品, ${collections.size} 个合集, ${unmatched.size} 个视频待识别")
 
         val renames = planRenames(scan, mapping, items)
@@ -430,6 +430,8 @@ class Scraper(
         return item.copy(
             title = title,
             originalTitle = (item.originalTitle ?: subject.name).takeIf { it != title },
+            // TMDB 的中文名留着当别名, 搜台译/机翻名也能找到
+            aliases = (listOf(item.title) + item.aliases).filter { it != title }.distinct(),
             bangumiId = subject.id,
         )
     }
@@ -470,6 +472,8 @@ class Scraper(
             imdbId = d.imdbId ?: d.externalIds?.imdbId,
             title = d.displayTitle,
             originalTitle = d.displayOriginal?.takeIf { it != d.displayTitle },
+            aliases = d.alternativeTitles?.all.orEmpty().filter { it.country in ALIAS_COUNTRIES }.map { it.title.trim() }
+                .filter { it.isNotEmpty() && it != d.displayTitle && it != d.displayOriginal }.distinct().take(10),
             year = d.year,
             overview = d.overview?.takeIf { it.isNotBlank() },
             genres = d.genres.map { GENRE_ZH[it.name] ?: it.name },
@@ -724,6 +728,9 @@ class Scraper(
     private companion object {
         /** TMDB 的「动画」类型. */
         const val ANIMATION = 16
+
+        /** 别名只收这些地区的: 两岸三地和新加坡的中文译名, 英文名, 日文名. */
+        val ALIAS_COUNTRIES = setOf("CN", "TW", "HK", "SG", "US", "GB", "JP")
 
         /** TMDB 剧集类型有几个没有中文翻译. */
         val GENRE_ZH = mapOf(

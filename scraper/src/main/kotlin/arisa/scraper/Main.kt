@@ -57,6 +57,10 @@ private const val USAGE = """arisa-scraper <命令> [参数]
   rename --apply                按计划文件改名
   serve                         常驻服务: 盯网盘变化、自动识别、生成索引, 带管理网页
 
+更新:
+  version                       当前版本
+  update                        马上检查更新 (常驻服务每隔几小时会自己检查)
+
 选项:
   --config <文件>   默认 ~/.arisa/config.yaml
 """
@@ -232,6 +236,17 @@ fun main(argv: Array<String>) {
                     skip.forEach { println("  ${it.parentPath}/${it.from}: ${it.skipped}") }
                     println("\n计划已写到 $planFile, 确认后运行 rename --apply")
                 }
+            }
+            "version" -> println(Updater.currentVersion())
+            "update" -> {
+                val c = Config.load(configFile).update
+                val updater = Updater(
+                    home, QuarkDrive(QuarkWebClient(state.load().cookie ?: throw LoginExpiredException("没有登录")), Config.load(configFile).rateLimit),
+                    http = { httpClient(c.proxy) }, log = ::println, idle = { true },
+                    restart = { println("已切换到新版, 常驻服务需要重启: launchctl kickstart -k gui/$(id -u)/com.arisa.scraper") },
+                )
+                updater.check(selfUpdate = c.selfUpdate, mirrorApp = c.app)
+                println("当前 ${Updater.currentVersion()}, 最新 ${updater.latest?.version}")
             }
             "serve" -> {
                 Service(home, configFile, state).start()

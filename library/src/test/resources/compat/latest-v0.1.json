@@ -1,0 +1,16 @@
+{
+ "version": "0.1.0",
+ "versionCode": 1000,
+ "publishedAt": 1793327439112,
+ "notes": "- 第一版",
+ "scraper": {
+  "name": "arisa-scraper-0.1.0.zip",
+  "size": 5828990,
+  "sha256": "01d393c6932a2ea38b3dcec46adb55d010b8096c1fce7b90f036ed580bf04e50"
+ },
+ "app": {
+  "name": "arisa-0.1.0.apk",
+  "size": 8657513,
+  "sha256": "70126f35bc368d136f05ee609be4ed4bed0fcfd9e99e9490de98508fd408a5d4"
+ }
+}

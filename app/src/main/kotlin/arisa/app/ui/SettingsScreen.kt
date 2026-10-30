@@ -26,6 +26,8 @@ import androidx.tv.material3.Switch
 import androidx.tv.material3.Text
 import kotlinx.coroutines.launch
 import arisa.app.ArisaApp
+import arisa.app.BuildConfig
+import arisa.app.data.AppUpdater
 import arisa.app.data.LibraryRepository
 import java.text.SimpleDateFormat
 import java.util.Date
@@ -74,6 +76,7 @@ fun SettingsScreen(onLogout: () -> Unit) {
                 LibraryRepository.Status.Loading -> "同步中…"
                 is LibraryRepository.Status.Error -> "失败: ${s.message}"
                 LibraryRepository.Status.NoIndex -> "网盘里还没有片库"
+                LibraryRepository.Status.NeedsAppUpdate -> "片库是新版刮削器生成的, 需要先更新 App"
                 LibraryRepository.Status.Idle -> lib?.let {
                     "${it.items.size} 部 · 刮削于 " + SimpleDateFormat("MM-dd HH:mm", Locale.CHINA).format(Date(it.generatedAt))
                 } ?: "—"
@@ -114,11 +117,46 @@ fun SettingsScreen(onLogout: () -> Unit) {
                 supportingContent = { Text("播放时把电视切到和片源一样的帧率 (如 24Hz), 切换时会黑屏一两秒") },
                 trailingContent = { Switch(checked = matchFrameRate, onCheckedChange = null) },
             )
+            val update by app.updater.state.collectAsStateWithLifecycle()
+            ListItem(
+                selected = false,
+                onClick = {
+                    when (update) {
+                        is AppUpdater.State.Available -> scope.launch { app.updater.download() }
+                        is AppUpdater.State.Ready -> app.updater.install()
+                        is AppUpdater.State.Downloading, AppUpdater.State.Checking -> {}
+                        else -> scope.launch { app.updater.check() }
+                    }
+                },
+                headlineContent = { Text(updateTitle(update)) },
+                supportingContent = { Text(updateDetail(update), maxLines = 4) },
+            )
             ListItem(
                 selected = false,
                 onClick = onLogout,
                 headlineContent = { Text(if (app.session.demo) "退出演示模式" else "退出登录") },
             )
         }
+    }
+}
+
+private fun updateTitle(state: AppUpdater.State) = when (state) {
+    is AppUpdater.State.Available -> "下载新版本 ${state.manifest.version}"
+    is AppUpdater.State.Downloading -> "正在下载 ${state.manifest.version}… ${(state.progress * 100).toInt()}%"
+    is AppUpdater.State.Ready -> "安装新版本 ${state.manifest.version}"
+    else -> "检查更新"
+}
+
+private fun updateDetail(state: AppUpdater.State): String {
+    val current = "当前版本 ${BuildConfig.VERSION_NAME}"
+    return when (state) {
+        AppUpdater.State.Idle -> current
+        AppUpdater.State.Checking -> "$current · 检查中…"
+        AppUpdater.State.UpToDate -> "$current · 已经是最新版"
+        AppUpdater.State.NotFound -> "$current · 网盘里还没有安装包 (刮削器会把新版本转存过来)"
+        is AppUpdater.State.Error -> "$current · ${state.message}"
+        is AppUpdater.State.Available -> "$current\n${state.manifest.notes.orEmpty()}".trim()
+        is AppUpdater.State.Downloading -> current
+        is AppUpdater.State.Ready -> "$current · 已下载, 点一下打开系统安装界面"
     }
 }

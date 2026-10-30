@@ -38,6 +38,8 @@ class LibraryRepository(
         /** 网盘里还没有索引, 刮削器没跑过. */
         data object NoIndex : Status
         data class Error(val message: String) : Status
+        /** 片库是新版刮削器按新格式写的, 这个版本的 App 读不了, 要到设置里更新. 继续显示旧的片库. */
+        data object NeedsAppUpdate : Status
     }
 
     private val cacheFile = File(context.filesDir, "library.json.gz")
@@ -61,7 +63,7 @@ class LibraryRepository(
             return@withContext
         }
         if (cacheFile.exists()) {
-            _library.value = runCatching { LibraryCodec.decode(cacheFile.readBytes()).playableFirst() }.getOrNull()
+            _library.value = runCatching { LibraryCodec.decode(cacheFile.readBytes()).takeIf { it.schema <= Library.SCHEMA }?.playableFirst() }.getOrNull()
         }
     }
 
@@ -79,10 +81,12 @@ class LibraryRepository(
                     if (latest != cacheNameFile.takeIf { it.exists() }?.readText() || _library.value == null) {
                         val fid = files.first { it.name == latest }.fid
                         val bytes = fetch(client.downloadLink(fid))
-                        val lib = LibraryCodec.decode(bytes).playableFirst()
+                        val lib = LibraryCodec.decode(bytes)
+                        // 格式比 App 认识的新: 新版刮削器做了不兼容的改动, 不用它, 免得读出错的东西
+                        if (lib.schema > Library.SCHEMA) return@withLock Status.NeedsAppUpdate.also { _status.value = it }
                         cacheFile.writeBytes(bytes)
                         cacheNameFile.writeText(latest)
-                        _library.value = lib
+                        _library.value = lib.playableFirst()
                     }
                     Status.Idle
                 }

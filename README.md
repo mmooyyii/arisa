@@ -21,13 +21,26 @@ TV 和 mac mini 不直接通信, TV 只需要扫码登录夸克.
 
 ## 刮削器
 
+在 mac mini 上安装 (需要 JDK 17+), 装好后作为 launchd 常驻服务运行, 之后自动更新:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/mmooyyii/arisa/main/deploy/install.sh | sh
+# 填 ~/.arisa/config.yaml 里的 tmdb.api_key 和片库目录, 然后:
+arisa-scraper login      # 终端扫码登录夸克
+arisa-scraper ls /电影   # 确认能列目录
+launchctl kickstart -k gui/$(id -u)/com.arisa.scraper   # 重启服务, 管理网页 http://localhost:7893
+```
+
+自动更新: 常驻服务每 6 小时看一次 GitHub 上的最新版本, 有新版就下载到 `~/.arisa/versions/<版本>`,
+等手上的任务做完后切换 `~/.arisa/current` 重启; 同时把新版 TV App 转存到网盘 `/.arisa/app/`.
+`arisa-scraper update` 马上检查一次; 配置见 `config.example.yaml` 的 `update`.
+新版出问题时可以手动切回上一版: `ln -sfn versions/<旧版本> ~/.arisa/current` 后重启服务.
+
+开发时直接用源码跑 (不会自动更新):
+
 ```sh
 ./gradlew :scraper:installDist
-cp config.example.yaml ~/.arisa/config.yaml   # 填 tmdb.api_key 和片库目录
-S=scraper/build/install/arisa-scraper/bin/arisa-scraper
-$S login                 # 粘贴 pan.quark.cn 的 Cookie
-$S ls /电影              # 确认能列目录
-$S serve                 # 常驻服务, 管理网页 http://localhost:7893
+scraper/build/install/arisa-scraper/bin/arisa-scraper serve
 ```
 
 常驻服务 (`serve`) 的流程:
@@ -51,6 +64,11 @@ $S serve                 # 常驻服务, 管理网页 http://localhost:7893
 
 ## TV App
 
+从 [Releases](https://github.com/mmooyyii/arisa/releases) 下载 `arisa-<版本>.apk` 装到电视上 (U 盘或 `adb install`).
+之后的版本由刮削器转存到网盘, 在 TV 的「设置 → 检查更新」里下载安装 (第一次要在系统设置里允许 Arisa 安装应用).
+
+开发:
+
 ```sh
 ./gradlew :app:installDebug
 ```
@@ -64,3 +82,13 @@ $S serve                 # 常驻服务, 管理网页 http://localhost:7893
 - 字幕: 内封字幕 + 视频旁边的外挂字幕 (srt/ass/ssa/vtt, GBK/Big5 自动转码), 默认中文; 每部作品记住上次选的音轨和字幕
 - 剧集最后 30 秒提示下一集, 播完自动接着播; 直链过期或断网时换新链接从原位置接着播
 - 设置里可以开「自动切换刷新率」(24p 片源切 24Hz)
+
+## 发版
+
+推一个 `v` 开头的标签, GitHub Actions 打包刮削器和 TV App 发到 Releases, 刮削器会自动更新过去:
+
+```sh
+git tag v0.2.0 && git push origin v0.2.0
+```
+
+不同版本的刮削器和 App 会同时存在, 改索引格式前先看 `CLAUDE.md` 里的兼容规则.

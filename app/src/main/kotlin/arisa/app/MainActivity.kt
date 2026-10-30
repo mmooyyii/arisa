@@ -78,6 +78,7 @@ class MainActivity : ComponentActivity() {
             app.library.loadCached()
             app.library.refresh()
             app.syncProgress(onlyIfDirty = false)
+            app.updater.check()
         }
         BackHandler(enabled = stack.size > 1) { saveable.removeState(stack.removeAt(stack.lastIndex).toString()) }
 

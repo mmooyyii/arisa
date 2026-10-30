@@ -59,6 +59,9 @@ class Service(
         val renames: Int = 0,
         val agentEnabled: Boolean = false,
         val agentCostToday: Double = 0.0,
+        val version: String = "",
+        /** GitHub 上的最新版本, 还没检查过是 null. */
+        val latestVersion: String? = null,
     )
 
     @Volatile private var busy: String? = null
@@ -87,6 +90,8 @@ class Service(
         renames = renamePlans().count { it.skipped == null },
         agentEnabled = runCatching { config().agent.on }.getOrDefault(false),
         agentCostToday = costToday,
+        version = Updater.currentVersion(),
+        latestVersion = updater.latest?.version,
     )
 
     fun activity(): List<String> = synchronized(activity) { activity.toList().asReversed() }
@@ -393,6 +398,24 @@ class Service(
 
     // ---------- 运行 ----------
 
+    val updater = Updater(
+        home, drive,
+        http = { httpClient(config().update.proxy) },
+        log = ::log,
+        idle = { busy == null && synchronized(queue) { queue.isEmpty() } },
+        restart = {
+            log("重启")
+            // launchd 的 KeepAlive 会用 ~/.arisa/current 里的新版拉起来
+            kotlin.system.exitProcess(0)
+        },
+    )
+
+    /** 检查更新, 网页和定时任务调. */
+    fun checkUpdate() {
+        val c = config().update
+        runCatching { updater.check(c.selfUpdate, c.app) }.onFailure { log("检查更新失败: ${it.message}") }
+    }
+
     fun start() {
         val config = config()
         submit(Job.Scan(full = !File(home, "scan-cache.json").exists(), reason = "启动"))
@@ -404,6 +427,14 @@ class Service(
                 Thread.sleep(if (loginError != null) 600_000L else config().serve.pollSeconds * 1000L)
             }
         }, "arisa-watch").apply { isDaemon = true }.start()
+        Thread({
+            Thread.sleep(60_000)
+            while (true) {
+                checkUpdate()
+                Thread.sleep(config().update.checkHours.coerceAtLeast(1) * 3_600_000L)
+            }
+        }, "arisa-update").apply { isDaemon = true }.start()
+        log("刮削器版本 ${Updater.currentVersion()}")
         WebServer(this, config.serve.port).start()
         log("Arisa 刮削服务已启动, http://localhost:${config.serve.port}")
     }

@@ -107,6 +107,19 @@ data class ServeConfig(
     @SerialName("full_scan_hour") val fullScanHour: Int = 4,
 )
 
+/** 自动更新, 见 [Updater]. */
+@Serializable
+data class UpdateConfig(
+    /** 刮削器自动更新到最新版 (只对 install.sh 装的生效). */
+    @SerialName("self_update") val selfUpdate: Boolean = true,
+    /** 把新版 TV App 转存到网盘, TV 在设置里更新. */
+    val app: Boolean = true,
+    /** 多久检查一次. */
+    @SerialName("check_hours") val checkHours: Int = 6,
+    /** 可选代理, 如 http://127.0.0.1:7890 (GitHub 直连不稳时配上) */
+    val proxy: String? = null,
+)
+
 @Serializable
 data class Config(
     val defaults: Defaults = Defaults(),
@@ -116,6 +129,7 @@ data class Config(
     val scan: ScanConfig = ScanConfig(),
     val agent: AgentConfig = AgentConfig(),
     val serve: ServeConfig = ServeConfig(),
+    val update: UpdateConfig = UpdateConfig(),
     val libraries: List<LibraryConfig> = emptyList(),
 ) {
     /** 合并 defaults 和片库自己的覆盖项. */

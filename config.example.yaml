@@ -30,6 +30,13 @@ serve:
   poll_seconds: 90           # 多久看一次夸克的「最近」, 同时给登录续期
   full_scan_hour: 4          # 每天几点全量重扫
 
+# 自动更新: 定时看 GitHub 上有没有新版本
+update:
+  self_update: true          # 刮削器自动更新并重启 (只对 deploy/install.sh 装的生效)
+  app: true                  # 新版 TV App 转存到网盘 /.arisa/app/, 在 TV 的设置里点更新
+  check_hours: 6
+  # proxy: http://127.0.0.1:7890  # GitHub 直连不稳时配上
+
 rate_limit:
   list_per_sec: 2
   upload_per_sec: 1

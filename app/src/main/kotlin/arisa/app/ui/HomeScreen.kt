@@ -44,6 +44,7 @@ import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import arisa.app.ArisaApp
+import arisa.app.data.AppUpdater
 import arisa.app.data.LibraryRepository
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -240,6 +241,9 @@ private fun TopBar(onBrowse: () -> Unit, onSearch: () -> Unit, onSettings: () ->
         if (status is LibraryRepository.Status.Loading) {
             Text("同步中…", style = MaterialTheme.typography.labelSmall)
         }
+        if (status is LibraryRepository.Status.NeedsAppUpdate) {
+            Text("片库需要新版 App, 到设置里更新", style = MaterialTheme.typography.labelSmall, color = Palette.Accent)
+        }
         Spacer(Modifier.weight(1f))
         val colors = ButtonDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f))
         Button(onClick = onBrowse, colors = colors, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
@@ -250,8 +254,12 @@ private fun TopBar(onBrowse: () -> Unit, onSearch: () -> Unit, onSettings: () ->
             Text("搜索", style = MaterialTheme.typography.labelMedium)
         }
         Spacer(Modifier.width(12.dp))
+        val update by ArisaApp.instance.updater.state.collectAsStateWithLifecycle()
         Button(onClick = onSettings, colors = colors, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
             Text("设置", style = MaterialTheme.typography.labelMedium)
+            if (update is AppUpdater.State.Available || update is AppUpdater.State.Ready) {
+                Text(" · 有新版本", style = MaterialTheme.typography.labelMedium, color = Palette.Accent)
+            }
         }
     }
 }
@@ -285,6 +293,7 @@ private fun EmptyState(status: LibraryRepository.Status, onSettings: () -> Unit)
                 LibraryRepository.Status.Loading, LibraryRepository.Status.Idle -> "正在读取片库…" to null
                 LibraryRepository.Status.NoIndex -> "网盘里还没有片库" to "在 mac mini 上运行刮削器 (arisa-scraper scan) 后会自动出现"
                 is LibraryRepository.Status.Error -> "读取片库失败" to status.message
+                LibraryRepository.Status.NeedsAppUpdate -> "片库需要新版 App" to "到设置里更新 App"
             }
             Text(title, style = MaterialTheme.typography.headlineSmall)
             detail?.let {

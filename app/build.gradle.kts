@@ -1,8 +1,32 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
     id("org.jetbrains.kotlin.plugin.serialization")
+}
+
+val arisaVersion: String by rootProject.extra
+val arisaVersionCode: Int by rootProject.extra
+
+/**
+ * 正式签名: CI 从环境变量读, 本地从 ~/.android/arisa-release.properties 读.
+ * 都没有时 release 包用 debug 签名, 只能自己装着玩, 不能覆盖安装正式版.
+ */
+val releaseSigning: Properties? = run {
+    val env = System.getenv()
+    if (env["ARISA_KEYSTORE"] != null) {
+        Properties().apply {
+            setProperty("storeFile", env.getValue("ARISA_KEYSTORE"))
+            setProperty("storePassword", env.getValue("ARISA_KEYSTORE_PASSWORD"))
+            setProperty("keyAlias", env["ARISA_KEY_ALIAS"] ?: "arisa")
+            setProperty("keyPassword", env["ARISA_KEY_PASSWORD"] ?: env.getValue("ARISA_KEYSTORE_PASSWORD"))
+        }
+    } else {
+        File(System.getProperty("user.home"), ".android/arisa-release.properties").takeIf { it.exists() }
+            ?.let { f -> Properties().apply { f.inputStream().use(::load) } }
+    }
 }
 
 android {
@@ -13,8 +37,19 @@ android {
         applicationId = "arisa.app"
         minSdk = 23
         targetSdk = 35
-        versionCode = 1
-        versionName = "0.1.0"
+        versionCode = arisaVersionCode
+        versionName = arisaVersion
+    }
+
+    signingConfigs {
+        releaseSigning?.let { p ->
+            create("release") {
+                storeFile = file(p.getProperty("storeFile"))
+                storePassword = p.getProperty("storePassword")
+                keyAlias = p.getProperty("keyAlias")
+                keyPassword = p.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
@@ -22,7 +57,10 @@ android {
             isMinifyEnabled = true
             isShrinkResources = true
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
-            signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
+            // 电视盒子都是 ARM; x86 的 FFmpeg 库只有模拟器用得上, debug 包里留着
+            // -Parisa.allAbis 时全带上, 在模拟器上验证 release 包用
+            if (!project.hasProperty("arisa.allAbis")) ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
         }
     }
     compileOptions {
@@ -34,9 +72,19 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
-        resources.excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        // 运行时用不到的元数据和许可证文本
+        resources.excludes += listOf(
+            "/META-INF/{AL2.0,LGPL2.1}", "/META-INF/androidx/**", "/META-INF/*.version", "/META-INF/*.kotlin_module",
+            "/kotlin/**", "DebugProbesKt.bin",
+        )
+    }
+    // Google Play 用的依赖清单, 自己分发用不上
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
     }
 }
 

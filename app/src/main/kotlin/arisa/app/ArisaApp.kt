@@ -14,6 +14,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.launch
+import arisa.app.data.AppUpdater
 import arisa.app.data.LibraryRepository
 import arisa.app.data.ProgressStore
 import arisa.app.data.SessionStore
@@ -25,6 +26,8 @@ class ArisaApp : Application(), SingletonImageLoader.Factory {
     lateinit var library: LibraryRepository
         private set
     lateinit var progress: ProgressStore
+        private set
+    lateinit var updater: AppUpdater
         private set
 
     /** 不跟着页面走的后台任务 (退出播放后同步进度). */
@@ -49,6 +52,7 @@ class ArisaApp : Application(), SingletonImageLoader.Factory {
         session = SessionStore(this, http)
         library = LibraryRepository(this, session, http)
         progress = ProgressStore(this)
+        updater = AppUpdater(this, session, http)
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

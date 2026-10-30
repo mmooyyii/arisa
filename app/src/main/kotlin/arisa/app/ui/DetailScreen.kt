@@ -1,5 +1,6 @@
 package arisa.app.ui
 
+import androidx.compose.ui.platform.LocalDensity
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.onFocusChanged
@@ -72,7 +73,7 @@ fun DetailScreen(
     val app = ArisaApp.instance
     val library by app.library.library.collectAsStateWithLifecycle()
     val progress by app.progress.all.collectAsStateWithLifecycle()
-    val item = library?.items?.firstOrNull { it.id == id } ?: return
+    val item = remember(library, id) { app.library.item(id) } ?: return
 
     val playFocus = remember { FocusRequester() }
     val listState = rememberLazyListState()
@@ -80,14 +81,17 @@ fun DetailScreen(
     LaunchedEffect(id) { runCatching { playFocus.requestFocus() } }
 
     // 默认播哪个文件: 电影取第一个版本; 剧集取看到一半的那集, 或者看完那集的下一集, 否则第一集
-    val episodes = item.seasons.flatMap { it.episodes }
+    val episodes = remember(item) { item.seasons.flatMap { it.episodes } }
     val resume: Pair<Episode?, PlaybackProgress?> = remember(item, progress) { resumeTarget(item, episodes, progress) }
     val targetFid = resume.first?.files?.firstOrNull()?.fid ?: item.files.firstOrNull()?.fid
     val resumeProgress = resume.second
 
     Box(Modifier.fillMaxSize()) {
         Backdrop(item, dim = 1f)
-        CompositionLocalProvider(LocalBringIntoViewSpec provides MinimalBringIntoView) {
+        // 往下滚到卡片时底部多留一段, 卡片下面的名字 (演职员、选集标题) 才不会被屏幕底边切掉
+        val textBelow = with(LocalDensity.current) { 64.dp.toPx() }
+        val bringIntoView = remember(textBelow) { minimalBringIntoView(textBelow) }
+        CompositionLocalProvider(LocalBringIntoViewSpec provides bringIntoView) {
             LazyColumn(
                 state = listState,
                 contentPadding = PaddingValues(start = 56.dp, end = 56.dp, top = 72.dp, bottom = 48.dp),
@@ -161,10 +165,7 @@ fun DetailScreen(
 
                 if (item.cast.isNotEmpty()) {
                     item(key = "cast") {
-                        // 焦点进来时整行滚进屏幕, 只按头像滚的话名字会被底边切掉
-                        Column(Modifier.onFocusChanged {
-                            if (it.hasFocus) scope.launch { listState.animateScrollToItem(listState.layoutInfo.totalItemsCount - 1) }
-                        }) {
+                        Column {
                             SectionTitle("演职员")
                             LazyRow(horizontalArrangement = Arrangement.spacedBy(20.dp)) {
                                 items(item.cast) { c ->

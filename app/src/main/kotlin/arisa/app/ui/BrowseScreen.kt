@@ -20,6 +20,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.saveable.Saver
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
@@ -72,10 +73,12 @@ fun BrowseScreen(initial: BrowseFilter, onOpen: (String) -> Unit, onOpenCollecti
     val firstCard = remember { FocusRequester() }
     val restore = remember { FocusRequester() }
     val gridState = rememberLazyGridState()
+    // 只读一次, 卡片里读 lastFocus 的话焦点每动一下所有卡片都要重组
+    val restoreKey = remember { Snapshot.withoutReadObservation { lastFocus } }
 
     LaunchedEffect(Unit) {
         withFrameNanos { }
-        if (lastFocus == null || runCatching { restore.requestFocus() }.isFailure) {
+        if (restoreKey == null || runCatching { restore.requestFocus() }.isFailure) {
             runCatching { if (cards.isNotEmpty()) firstCard.requestFocus() else buttons.getValue(Dimension.TYPE).requestFocus() }
         }
     }
@@ -144,7 +147,7 @@ fun BrowseScreen(initial: BrowseFilter, onOpen: (String) -> Unit, onOpenCollecti
                     badge = c?.let { "合集 · ${it.members.size} 部" },
                     modifier = Modifier
                         .then(if (card == cards.first()) Modifier.focusRequester(firstCard) else Modifier)
-                        .then(if (card.key == lastFocus) Modifier.focusRequester(restore) else Modifier)
+                        .then(if (card.key == restoreKey) Modifier.focusRequester(restore) else Modifier)
                         .onFocusChanged { if (it.hasFocus) lastFocus = card.key },
                 )
             }

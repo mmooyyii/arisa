@@ -117,12 +117,26 @@ class LibraryRepository(
         _library.value = null
     }
 
-    fun item(id: String): MediaItem? = _library.value?.items?.firstOrNull { it.id == id }
+    fun item(id: String): MediaItem? = index()?.items?.get(id)
 
-    fun collection(id: String): MediaCollection? = _library.value?.collections?.firstOrNull { it.id == id }
+    fun collection(id: String): MediaCollection? = index()?.collections?.get(id)
 
     /** 没识别出来的视频, 不属于任何作品, 按 fid 找. */
-    fun unmatchedFile(fid: String): MediaFile? = _library.value?.unmatched?.firstOrNull { it.fid == fid }
+    fun unmatchedFile(fid: String): MediaFile? = index()?.unmatched?.get(fid)
+
+    /** 按 id 查的索引, 片库换了才重建. 合集页、详情页每次查都扫一遍列表, 片子多了慢. */
+    private class Index(val library: Library) {
+        val items = library.items.associateBy { it.id }
+        val collections = library.collections.associateBy { it.id }
+        val unmatched = library.unmatched.associateBy { it.fid }
+    }
+
+    @Volatile private var index: Index? = null
+
+    private fun index(): Index? {
+        val lib = _library.value ?: return null
+        return index?.takeIf { it.library === lib } ?: Index(lib).also { index = it }
+    }
 
     /** 播放用的原文件直链 (要带 Cookie), 每次播放前现取 (直链会过期). */
     suspend fun playLink(file: MediaFile): QuarkLink = withContext(Dispatchers.IO) {

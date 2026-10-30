@@ -9,8 +9,9 @@ import kotlin.math.withSign
 /** BlurHash 解码成小图, 作为大图加载前的占位. 算法见 https://github.com/woltapp/blurhash */
 object BlurHashDecoder {
     private const val CHARS = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz#\$%*+,-.:;=?@[]^_{|}~"
-    private val cache = object : LinkedHashMap<String, Bitmap>(64, 0.75f, true) {
-        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?) = size > 64
+    private val cache = object : LinkedHashMap<String, Bitmap>(256, 0.75f, true) {
+        // 一张 32x20 只有 2.5KB; 首页一屏加上左右滚动就有上百张卡片, 太小会来回重新解码
+        override fun removeEldestEntry(eldest: MutableMap.MutableEntry<String, Bitmap>?) = size > 256
     }
 
     fun decode(hash: String?, width: Int = 32, height: Int = 20): Bitmap? {
@@ -40,11 +41,14 @@ object BlurHashDecoder {
                 )
             }
         }
+        // cos 只和 (x, i)、(y, j) 有关, 先算好, 不在每个像素里重复算
+        val cosX = FloatArray(width * nx) { cos(PI * (it / nx) * (it % nx) / width).toFloat() }
+        val cosY = FloatArray(height * ny) { cos(PI * (it / ny) * (it % ny) / height).toFloat() }
         val pixels = IntArray(width * height)
         for (y in 0 until height) for (x in 0 until width) {
             var r = 0f; var g = 0f; var b = 0f
             for (j in 0 until ny) for (i in 0 until nx) {
-                val basis = (cos(PI * x * i / width) * cos(PI * y * j / height)).toFloat()
+                val basis = cosX[x * nx + i] * cosY[y * ny + j]
                 val c = colors[j * nx + i]
                 r += c[0] * basis; g += c[1] * basis; b += c[2] * basis
             }

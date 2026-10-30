@@ -214,17 +214,19 @@ fun qualityTags(files: List<MediaFile>): List<String> {
     val names = files.joinToString(" ") { it.name }.lowercase()
     return buildList {
         when {
-            Regex("2160p|4k|uhd").containsMatchIn(names) -> add("4K")
-            Regex("1080p").containsMatchIn(names) -> add("1080P")
+            "2160p" in names || "4k" in names || "uhd" in names -> add("4K")
+            "1080p" in names -> add("1080P")
         }
         when {
-            // 「4K DV杜比视界」: DV 后面紧跟汉字, \\b 不算边界, 用前后不是字母判断
-            Regex("杜比视界|dolby.?vision|dovi|(?<![a-z])dv(?![a-z])").containsMatchIn(names) -> add("杜比视界")
-            Regex("hdr").containsMatchIn(names) -> add("HDR")
+            DOLBY_VISION.containsMatchIn(names) -> add("杜比视界")
+            "hdr" in names -> add("HDR")
         }
-        if (Regex("atmos").containsMatchIn(names)) add("ATMOS")
+        if ("atmos" in names) add("ATMOS")
     }
 }
+
+/** 「4K DV杜比视界」: DV 后面紧跟汉字, \\b 不算边界, 用前后不是字母判断. 首页焦点每动一下都要用, 只编译一次. */
+private val DOLBY_VISION = Regex("杜比视界|dolby.?vision|dovi|(?<![a-z])dv(?![a-z])")
 
 fun formatRuntime(minutes: Int): String =
     if (minutes >= 60) "${minutes / 60} 小时 ${minutes % 60} 分" else "$minutes 分钟"
@@ -328,7 +330,7 @@ fun SectionTitle(text: String, modifier: Modifier = Modifier) {
 
 /**
  * TV 上 LazyColumn 默认把焦点项滚到固定位置 (pivot), 详情页这种一屏能放下的会被顶上去.
- * 这个版本只在焦点项超出可见区域时才滚动.
+ * 这个版本只在焦点项超出可见区域时才滚动. [trailingMargin]: 往下滚时焦点项下面多露出的距离, 给卡片下方的文字留位置.
  */
 @OptIn(ExperimentalFoundationApi::class)
 fun minimalBringIntoView(trailingMargin: Float = 0f) = object : BringIntoViewSpec {

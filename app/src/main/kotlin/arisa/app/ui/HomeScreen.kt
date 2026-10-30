@@ -28,7 +28,10 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -94,36 +97,41 @@ fun HomeScreen(
     // 遥控器连按时背景不动, 换背景对电视 GPU 是重活
     var focused by remember {
         mutableStateOf(
-            lastFocus?.substringAfter(':')?.let { id -> lib.items.firstOrNull { it.id == id } }
+            Snapshot.withoutReadObservation { lastFocus }?.substringAfter(':')?.let(app.library::item)
                 ?: continueWatching.firstOrNull()?.item ?: lib.items.firstOrNull()
         )
     }
     var hero by remember { mutableStateOf(focused) }
     val context = LocalContext.current
-    LaunchedEffect(focused) {
-        focused?.let { prefetchBackdrop(context, it) }
-        delay(300)
-        hero = focused
+    // 在 snapshotFlow 里读焦点, 不在页面里读: 页面里读的话每按一下方向键整个首页都要重组
+    LaunchedEffect(Unit) {
+        snapshotFlow { focused }.collectLatest { f ->
+            f?.let { prefetchBackdrop(context, it) }
+            delay(300)
+            hero = f
+        }
     }
 
     val firstFocus = remember { FocusRequester() }
     val restoreFocus = remember { FocusRequester() }
+    // 进页面时要恢复的那张, 只读一次: 卡片里直接读 lastFocus 的话, 焦点每动一下屏幕上所有卡片都要重组
+    val restoreKey = remember { Snapshot.withoutReadObservation { lastFocus } }
     LaunchedEffect(Unit) {
         // 卡片要等列表按保存的位置排好才能聚焦, 等一帧再试
         withFrameNanos { }
-        if (lastFocus == null || runCatching { restoreFocus.requestFocus() }.isFailure) runCatching { firstFocus.requestFocus() }
+        if (restoreKey == null || runCatching { restoreFocus.requestFocus() }.isFailure) runCatching { firstFocus.requestFocus() }
     }
     fun Modifier.track(key: String, isFirst: Boolean) = this
         .then(if (isFirst) Modifier.focusRequester(firstFocus) else Modifier)
-        .then(if (key == lastFocus) Modifier.focusRequester(restoreFocus) else Modifier)
+        .then(if (key == restoreKey) Modifier.focusRequester(restoreFocus) else Modifier)
         .onFocusChanged { if (it.hasFocus) lastFocus = key }
 
     Box(Modifier.fillMaxSize()) {
-        Backdrop(hero)
+        HomeBackdrop { hero }
 
         Column(Modifier.fillMaxSize()) {
             TopBar(onBrowse = { onBrowse(BrowseFilter()) }, onSearch, onSettings, status)
-            focused?.let { HeroInfo(it, Modifier.padding(start = 56.dp, end = 56.dp).height(220.dp)) }
+            HeroInfo({ focused }, Modifier.padding(start = 56.dp, end = 56.dp).height(220.dp))
             Spacer(Modifier.height(12.dp))
 
             LazyColumn(
@@ -264,10 +272,15 @@ private fun TopBar(onBrowse: () -> Unit, onSearch: () -> Unit, onSettings: () ->
     }
 }
 
+/** 背景和焦点信息按 lambda 传, 只有它们自己跟着焦点重组. */
 @Composable
-private fun HeroInfo(item: MediaItem, modifier: Modifier = Modifier) {
+private fun HomeBackdrop(item: () -> MediaItem?) = Backdrop(item())
+
+@Composable
+private fun HeroInfo(item: () -> MediaItem?, modifier: Modifier = Modifier) {
+    val target = item() ?: return
     AnimatedContent(
-        targetState = item,
+        targetState = target,
         transitionSpec = { fadeIn(tween(400)) togetherWith fadeOut(tween(200)) },
         contentKey = { it.id },
         modifier = modifier,

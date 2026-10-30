@@ -1,0 +1,11 @@
+# 基线配置文件: App 是侧载的, 没有 Play 下发的云端配置, 不写的话自己的代码装好后要靠 JIT 慢慢热起来,
+# 头几次打开首页、滚动列表会卡. 安装后由 profileinstaller (Compose 自带依赖) 在后台预编译这些方法.
+# Compose / Media3 等库自带配置, 这里只补自己的代码和启动时解析片库用到的 kotlinx-serialization.
+HSPLarisa/app/**->**(**)**
+Larisa/app/**;
+HSPLarisa/library/**->**(**)**
+Larisa/library/**;
+HSPLarisa/quark/**->**(**)**
+Larisa/quark/**;
+HSPLkotlinx/serialization/json/**->**(**)**
+Lkotlinx/serialization/json/**;

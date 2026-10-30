@@ -58,6 +58,36 @@
   .log div { padding: 2px 0; border-bottom: 1px solid #1a1d24; }
   .toast { position: fixed; bottom: 20px; right: 20px; background: var(--panel2); border: 1px solid var(--line); border-radius: 10px; padding: 10px 16px; display: none; }
   .search { margin-top: 10px; padding-top: 10px; border-top: 1px dashed var(--line); }
+  .chip.link { cursor: pointer; }
+  .chip.new { border-color: var(--ok); color: var(--ok); }
+  .qr { display: flex; gap: 18px; align-items: center; margin-top: 10px; }
+  .qr svg { width: 180px; height: 180px; border-radius: 8px; }
+  .seg { display: inline-flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+  .seg button { border: none; border-radius: 0; background: none; color: var(--dim); }
+  .seg button.on { background: var(--panel2); color: var(--text); }
+  .toolbar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .work { display: grid; grid-template-columns: 56px 1fr; gap: 14px; padding: 12px 0; border-bottom: 1px solid var(--line); }
+  .work img.poster { width: 56px; height: 84px; object-fit: cover; border-radius: 6px; background: var(--panel2); }
+  .work .t { font-weight: 600; }
+  .work .t a { color: inherit; text-decoration: none; }
+  .work .t a:hover { color: var(--accent); }
+  .maps { margin-top: 6px; }
+  .map { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13px; padding: 3px 0; }
+  .map .p { font-family: ui-monospace, Menlo, monospace; word-break: break-all; }
+  .map button { padding: 2px 8px; font-size: 12px; }
+  .badge { font-size: 11px; border: 1px solid var(--line); border-radius: 6px; padding: 0 6px; color: var(--dim); }
+  .form { display: grid; gap: 18px; max-width: 860px; }
+  .group { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 16px; }
+  .group h3 { margin: 0 0 12px; font-size: 15px; }
+  .field { display: grid; grid-template-columns: 160px 1fr; gap: 12px; align-items: center; margin-bottom: 10px; }
+  .field .hint { grid-column: 2; color: var(--dim); font-size: 12px; margin-top: -6px; }
+  .field input[type=text], .field input[type=number], .field select { width: 100%; max-width: 420px; }
+  .libs td { padding: 6px 4px; }
+  .libs input { width: 100%; }
+  .kv { display: grid; grid-template-columns: 160px 1fr; gap: 6px 12px; }
+  .kv .k { color: var(--dim); }
+  .notes { white-space: pre-wrap; color: var(--dim); font-size: 13px; margin-top: 10px; }
+  .savebar { position: sticky; bottom: 0; background: var(--bg); padding: 12px 0; border-top: 1px solid var(--line); display: flex; gap: 10px; align-items: center; }
 </style>
 </head>
 <body>
@@ -71,12 +101,27 @@
   <div id="banners"></div>
   <div class="tabs">
     <button class="tab on" data-tab="review">待确认<span class="n" id="n-review">0</span></button>
+    <button class="tab" data-tab="library">片库<span class="n" id="n-library">0</span></button>
     <button class="tab" data-tab="renames">改名<span class="n" id="n-renames">0</span></button>
     <button class="tab" data-tab="activity">动态</button>
+    <button class="tab" data-tab="settings">设置</button>
   </div>
   <section id="review"></section>
+  <section id="library" hidden>
+    <div class="toolbar">
+      <div class="seg" id="libseg">
+        <button data-v="done" class="on">已识别 <span id="n-done"></span></button>
+        <button data-v="pending">未识别 <span id="n-pending"></span></button>
+        <button data-v="skipped">已跳过 <span id="n-skipped"></span></button>
+      </div>
+      <input id="libq" placeholder="搜片名或网盘路径" style="flex:1;min-width:200px">
+      <select id="libtype"><option value="">电影和剧集</option><option value="movie">电影</option><option value="tv">剧集</option></select>
+    </div>
+    <div id="libbody"></div>
+  </section>
   <section id="renames" hidden></section>
   <section id="activity" hidden class="log"></section>
+  <section id="settings" hidden></section>
 </main>
 <div class="toast" id="toast"></div>
 
@@ -104,7 +149,9 @@ async function act(fn, msg) {
 document.querySelectorAll('.tab').forEach(b => b.onclick = () => {
   tab = b.dataset.tab;
   document.querySelectorAll('.tab').forEach(x => x.classList.toggle('on', x === b));
-  for (const id of ['review', 'renames', 'activity']) $('#' + id).hidden = id !== tab;
+  for (const id of ['review', 'library', 'renames', 'activity', 'settings']) $('#' + id).hidden = id !== tab;
+  if (tab === 'settings') loadSettings();
+  if (tab === 'library') { libSig = ''; }
   refresh();
 });
 
@@ -122,18 +169,48 @@ async function loadStatus() {
     chip('上次扫描', s.lastScan ?? '-'),
     chip('上次索引', s.lastBuild ?? '-'),
     chip('AI', s.agentEnabled ? `今天 ¥${s.agentCostToday.toFixed(2)}` : '关闭'),
+    `<span class="chip link ${s.latestVersion && s.latestVersion !== s.version && !s.version.includes('dev') ? 'new' : ''}" onclick="openTab('settings')">版本 <b>${esc(s.version)}</b>${
+      s.latestVersion && s.latestVersion !== s.version ? ' · 最新 ' + esc(s.latestVersion) : ''}</span>`,
   ].join('');
   $('#n-review').textContent = s.review;
   $('#n-renames').textContent = s.renames;
+  $('#n-library').textContent = s.items ?? 0;
   let b = '';
-  if (s.loginError) b += `<div class="banner bad"><b>夸克登录失效</b>：${esc(s.loginError)}
-    <div class="meta">浏览器打开 pan.quark.cn 扫码登录，开发者工具 → 网络，复制任一 drive-pc.quark.cn 请求的 Cookie 粘贴到这里。</div>
-    <textarea id="cookie" placeholder="Cookie"></textarea>
-    <button class="primary" onclick="saveCookie()">保存</button></div>`;
+  if (s.loginError) b += `<div class="banner bad"><b>夸克没有登录或登录失效</b>：${esc(s.loginError)}
+    <div class="qr" id="qrbox"><button class="primary" onclick="startLogin()">扫码登录</button>
+      <span class="meta">用手机夸克 App 扫码确认，登录后自动开始扫描</span></div>
+    <details style="margin-top:10px"><summary class="meta">或者粘贴 Cookie</summary>
+      <div class="meta">浏览器打开 pan.quark.cn 登录，开发者工具 → 网络，复制任一 drive-pc.quark.cn 请求的 Cookie 粘贴到这里。</div>
+      <textarea id="cookie" placeholder="Cookie"></textarea>
+      <button onclick="saveCookie()">保存</button></details></div>`;
   if (s.configError) b += `<div class="banner warn">${esc(s.configError)}</div>`;
-  // 用户正在输入 Cookie 时不刷掉
-  if (!document.activeElement || document.activeElement.id !== 'cookie') $('#banners').innerHTML = b;
+  // 正在输入 Cookie 或者正在扫码时不刷掉
+  const busy = (document.activeElement && document.activeElement.id === 'cookie') || login.token;
+  if (!busy) $('#banners').innerHTML = b;
+  if (!s.loginError && login.token) { stopLogin(); $('#banners').innerHTML = b; }
 }
+function openTab(t) { document.querySelector(`.tab[data-tab="${t}"]`).click(); }
+
+// ---------- 扫码登录 ----------
+const login = { token: null, timer: null };
+async function startLogin() {
+  stopLogin();
+  try {
+    const r = await api('/api/login/start', {});
+    login.token = r.token;
+    $('#qrbox').innerHTML = r.svg + '<div><div>用手机夸克 App 扫一扫，然后在手机上确认</div><div class="meta">二维码 4 分钟内有效</div>' +
+      '<button style="margin-top:8px" onclick="startLogin()">换一张</button></div>';
+    let n = 0;
+    login.timer = setInterval(async () => {
+      if (++n > 120) { stopLogin(); $('#qrbox').innerHTML = '<button class="primary" onclick="startLogin()">二维码过期了，重新获取</button>'; return; }
+      try {
+        const p = await api('/api/login/poll?token=' + encodeURIComponent(login.token));
+        if (p.done) { stopLogin(); toast('登录成功，开始扫描'); refresh(); }
+      } catch (e) { stopLogin(); toast('登录出错: ' + e.message); }
+    }, 2000);
+  } catch (e) { toast('出错: ' + e.message); }
+}
+function stopLogin() { clearInterval(login.timer); login.token = null; }
 function saveCookie() {
   const cookie = $('#cookie').value.trim();
   if (cookie) act(() => api('/api/cookie', { cookie }), '已保存，开始扫描');
@@ -154,17 +231,17 @@ async function loadReview() {
     if (e.guess) fillGuess(el, e.guess);
   });
 }
-function reviewCard(e, i) {
+function reviewCard(e, i, prefix = 'rv') {
   const w = e.work;
   const title = (w.rules.titles || [])[0] || '';
   const levels = [`<option value="${esc(w.key)}">${w.guess === 'tv' ? '剧集目录' : '这个文件'}（默认）</option>`]
     .concat((w.dirs || []).filter(d => d.fid !== w.key).map(d => `<option value="${esc(d.fid)}">目录：${esc(d.name)}</option>`));
   const cands = (w.candidates || []).map(c => candHtml(c)).join('');
-  return `<div class="card" id="rv${i}">
+  return `<div class="card" id="${prefix}${i}">
     <img class="thumb" loading="lazy" src="${w.sampleFid ? '/api/thumbnail?fid=' + encodeURIComponent(w.sampleFid) : ''}" onerror="this.style.visibility='hidden'">
     <div>
       <div class="path">${esc(w.path)}</div>
-      <div class="meta">${w.guess === 'tv' ? '剧集' : '电影'} · ${w.fileCount} 个视频${w.rules.year ? ' · ' + w.rules.year : ''} · ${{ai: 'AI 提问', unhandled: 'AI 没处理', error: 'AI 出错'}[e.by] || e.by}</div>
+      <div class="meta">${w.guess === 'tv' ? '剧集' : '电影'} · ${w.fileCount} 个视频${w.rules.year ? ' · ' + w.rules.year : ''} · ${{ai: 'AI 提问', unhandled: 'AI 没处理', error: 'AI 出错', pending: '未识别'}[e.by] || e.by}</div>
       <div class="reason">${esc(e.reason)}</div>
       <div class="samples">${(w.samples || []).map(esc).join('<br>')}</div>
       <div class="guess-slot"></div>
@@ -174,7 +251,7 @@ function reviewCard(e, i) {
         季 <input class="season" type="number" min="0" style="width:64px" placeholder="自动">
         集数 + <input class="offset" type="number" min="0" style="width:64px" placeholder="0" title="TMDB 把多季合成一季、文件按季内编号时填前面各季的集数">
         <button class="danger" onclick="decideRv(this, 'skip')">不是正片，跳过</button>
-        <button onclick="retryRv(this)">重新交给 AI</button>
+        ${e.by !== 'pending' || e.inReview ? '<button onclick="retryRv(this)">重新交给 AI</button>' : ''}
       </div>
       <div class="search row">
         <input class="q" value="${esc(title)}" placeholder="片名" style="flex:1;min-width:200px">
@@ -186,8 +263,8 @@ function reviewCard(e, i) {
     </div>
   </div>`;
 }
-function candHtml(c, guess) {
-  return `<div class="cand ${guess ? 'guess' : ''}" data-target="${esc(c.target)}" onclick="decideRv(this, this.dataset.target)" title="${esc(c.overview || '')}">
+function candHtml(c, guess, handler = 'decideRv') {
+  return `<div class="cand ${guess ? 'guess' : ''}" data-target="${esc(c.target)}" onclick="${handler}(this, this.dataset.target)" title="${esc(c.overview || '')}">
     ${c.poster ? `<img src="${IMG}${esc(c.poster)}">` : '<img>'}
     <div><div class="t">${guess ? 'AI 猜：' : ''}${esc(c.title)}${c.year ? ' (' + c.year + ')' : ''}</div>
     <div class="s">${esc(c.original || '')} ${c.target.startsWith('tv') ? '剧集' : '电影'} ${esc(c.target)}${c.score !== undefined ? ' · ' + c.score : ''}</div>
@@ -262,10 +339,245 @@ async function loadActivity() {
   $('#activity').innerHTML = list.length ? list.map(l => `<div>${esc(l)}</div>`).join('') : '<div class="empty">暂无</div>';
 }
 
+
+// ---------- 片库 ----------
+const BY = { skill: 'AI', user: '手动', nfo: 'NFO', rules: '规则' };
+let libView = 'done', libSig = '', libData = null, pendData = null;
+document.querySelectorAll('#libseg button').forEach(b => b.onclick = () => {
+  libView = b.dataset.v;
+  document.querySelectorAll('#libseg button').forEach(x => x.classList.toggle('on', x === b));
+  libSig = ''; renderLibrary();
+});
+$('#libq').oninput = $('#libtype').onchange = () => { libSig = ''; renderLibrary(); };
+
+async function loadLibrary() {
+  [libData, pendData] = await Promise.all([api('/api/library'), api('/api/pending')]);
+  $('#n-done').textContent = libData.items.length;
+  $('#n-pending').textContent = pendData.works.length;
+  $('#n-skipped').textContent = libData.skipped.length;
+  renderLibrary();
+}
+const day = t => t ? new Date(t).toLocaleDateString('zh-CN') : '';
+const hit = (q, ...xs) => !q || xs.some(x => String(x ?? '').toLowerCase().includes(q));
+
+function renderLibrary() {
+  if (!libData) return;
+  // 正在改某一条 (搜 TMDB) 时不重画, 免得输入被冲掉
+  const a = document.activeElement;
+  if (a && $('#libbody').contains(a) && (a.tagName === 'INPUT' || a.tagName === 'SELECT')) return;
+  const q = $('#libq').value.trim().toLowerCase(), type = $('#libtype').value;
+  const sig = JSON.stringify([libView, q, type, libData, pendData]);
+  if (sig === libSig) return;
+  libSig = sig;
+  const box = $('#libbody');
+  if (libView === 'done') {
+    const list = libData.items
+      .filter(it => (!type || it.type === type) && hit(q, it.title, it.originalTitle, it.year, ...it.mappings.map(m => m.path)))
+      .sort((x, y) => y.addedAt - x.addedAt);
+    if (!libData.generatedAt) { box.innerHTML = '<div class="empty">还没有生成过片库</div>'; return; }
+    box.innerHTML = list.length ? list.map(workHtml).join('') : '<div class="empty">没有符合的作品</div>';
+  } else if (libView === 'pending') {
+    if (!pendData.scanned) { box.innerHTML = '<div class="empty">服务启动后还没扫描完，稍等</div>'; return; }
+    const list = pendData.works.filter(p => (!type || p.work.guess === type) && hit(q, p.work.path, ...(p.work.rules.titles || [])));
+    box.innerHTML = list.length ? list.map((p, i) => reviewCard({
+      work: p.work, by: 'pending', inReview: p.inReview,
+      reason: p.inReview ? 'AI 拿不准，也在「待确认」里' : '还没识别：开着 AI 的话下次扫描会交给它，也可以直接在这里认',
+    }, i, 'pd')).join('') : '<div class="empty">全部都识别了</div>';
+    list.forEach((p, i) => { document.getElementById('pd' + i).entry = { work: p.work }; });
+  } else {
+    const list = libData.skipped.filter(m => hit(q, m.path));
+    box.innerHTML = list.length ? `<table><tr><th>网盘路径</th><th>谁定的</th><th>时间</th><th></th></tr>${list.map(m => `
+      <tr data-fid="${esc(m.fid)}" data-path="${esc(m.path)}"><td class="map p">${esc(m.path)}${m.note ? `<div class="meta">${esc(m.note)}</div>` : ''}</td><td>${esc(BY[m.by] || m.by)}</td><td class="meta">${day(m.at)}</td>
+      <td><button onclick="undecide(this.closest('tr').dataset)">撤销跳过</button></td></tr>`).join('')}</table>`
+      : '<div class="empty">没有跳过的</div>';
+  }
+}
+
+function workHtml(it) {
+  const [kind, id] = it.id.split(':');
+  const link = id && /^\d+$/.test(id) ? `https://www.themoviedb.org/${kind}/${id}` : '';
+  const info = [it.type === 'tv' ? `${it.seasons} 季` : '', `${it.files} 个视频`, it.rating ? '★ ' + it.rating : ''].filter(Boolean).join(' · ');
+  return `<div class="work" data-title="${esc(it.title)}" data-type="${it.type}">
+    ${it.poster ? `<img class="poster" loading="lazy" src="${IMG}${esc(it.poster)}">` : '<img class="poster">'}
+    <div>
+      <div class="t">${link ? `<a href="${link}" target="_blank">${esc(it.title)}</a>` : esc(it.title)}${it.year ? ` (${it.year})` : ''}
+        <span class="badge">${it.type === 'tv' ? '剧集' : '电影'}</span> <span class="meta">${info}</span></div>
+      ${it.originalTitle ? `<div class="meta">${esc(it.originalTitle)}</div>` : ''}
+      <div class="maps">${it.mappings.map(m => `<div class="map" data-fid="${esc(m.fid)}" data-path="${esc(m.path)}" data-season="${m.season ?? ''}" data-offset="${m.episodeOffset ?? ''}">
+        <span class="p">${esc(m.path)}</span><span class="badge">${esc(BY[m.by] || m.by)}</span>
+        ${m.season !== undefined ? `<span class="badge">第 ${m.season} 季</span>` : ''}
+        <span class="meta">${day(m.at)}</span>
+        <button onclick="remapOpen(this)">认错了，改成…</button>
+        <button class="danger" onclick="undecide(this.closest('.map').dataset)">撤销</button>
+      </div><div class="remap"></div>`).join('')}</div>
+    </div></div>`;
+}
+
+function remapOpen(btn) {
+  const { title, type } = btn.closest('.work').dataset;
+  const box = btn.closest('.map').nextElementSibling;
+  if (box.innerHTML) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div class="search row">
+      <input class="q" value="${esc(title)}" placeholder="片名" style="flex:1;min-width:200px">
+      <select class="kind"><option value="">全部</option><option value="movie" ${type === 'movie' ? 'selected' : ''}>电影</option><option value="tv" ${type === 'tv' ? 'selected' : ''}>剧集</option></select>
+      <input class="year" type="number" placeholder="年份" style="width:80px">
+      <button onclick="remapSearch(this)">搜 TMDB</button>
+      <button class="danger" onclick="remapTo(this, 'skip')">不是正片，跳过</button>
+    </div><div class="cands results"></div>`;
+  box.querySelector('.q').focus();
+}
+async function remapSearch(el) {
+  const box = el.closest('.remap');
+  const p = new URLSearchParams({ q: box.querySelector('.q').value.trim(), kind: box.querySelector('.kind').value, year: box.querySelector('.year').value });
+  const res = box.querySelector('.results');
+  res.innerHTML = '<span class="meta">搜索中…</span>';
+  try {
+    const list = await api('/api/tmdb/search?' + p);
+    res.innerHTML = list.length ? list.map(c => candHtml(c, false, 'remapTo')).join('') : '<span class="meta">没有结果</span>';
+  } catch (e) { res.innerHTML = `<span class="meta">${esc(e.message)}</span>`; }
+}
+function remapTo(el, target) {
+  const m = el.closest('.remap').previousElementSibling.dataset;
+  if (!confirm(`把 ${m.path} 改成 ${target === 'skip' ? '跳过' : target}？`)) return;
+  document.activeElement.blur();
+  act(() => api('/api/decide', { fid: m.fid, target, path: m.path,
+    season: m.season === '' ? null : +m.season, episodeOffset: m.offset === '' ? null : +m.offset }), '已改，正在生成索引');
+}
+function undecide({ fid, path }) {
+  if (!confirm(`撤销 ${path} 的识别结果？这些文件会回到「未识别」，下次扫描重新交给 AI`)) return;
+  act(() => api('/api/undecide', { fid }), '已撤销，正在重新扫描');
+}
+
+// ---------- 设置 ----------
+const OUTPUT = [['index', '只写索引'], ['index+nfo', '索引 + NFO'], ['index+full', '索引 + 全部 NFO 和图片']];
+const NFO = [['trust', '直接采用'], ['merge', '合并'], ['ignore', '不看'], ['overwrite', '覆盖']];
+const GROUPS = [
+  ['TMDB', [
+    ['tmdb.api_key', 'API Key', 'secret', 'themoviedb.org → 设置 → API，v3 key 或 v4 read token 都行', 'ARISA_TMDB_API_KEY'],
+    ['tmdb.proxy', '代理', 'proxy', '一般不用，默认走 api.tmdb.org，国内能直连'],
+  ]],
+  ['AI 识别 (DeepSeek)', [
+    ['agent.enabled', '启用', 'bool'],
+    ['agent.api_key', 'API Key', 'secret', 'platform.deepseek.com → API keys；不填就不用 AI，认不出的放进待确认', 'ARISA_DEEPSEEK_API_KEY'],
+    ['agent.model', '模型', 'text'],
+    ['agent.batch_size', '每批作品数', 'number'],
+    ['agent.timeout_minutes', '单次超时（分钟）', 'number'],
+  ]],
+  ['刮削默认值', [
+    ['defaults.output', '往网盘写什么', OUTPUT, '每个片库目录可以单独设'],
+    ['defaults.existing_nfo', '视频旁已有 NFO', NFO],
+    ['defaults.language', '语言', 'text', '如 zh-CN'],
+    ['defaults.fallback_language', '简介回退语言', 'text', '主语言没有简介时用'],
+    ['defaults.confidence_threshold', '自动接受门槛', 'number', '0~1，规则匹配的把握高于它直接入库'],
+  ]],
+  ['Bangumi', [['bangumi.proxy', '代理', 'proxy', 'api.bgm.tv 直连不通时配']]],
+  ['自动更新', [
+    ['update.self_update', '刮削器自动更新', 'bool', '只对 install.sh 装的生效，从源码运行的不会更新'],
+    ['update.app', '转存 TV App 到网盘', 'bool', '新版 App 放到 /.arisa/app/，在 TV 的设置里更新'],
+    ['update.check_hours', '检查间隔（小时）', 'number'],
+    ['update.proxy', '代理', 'proxy', 'GitHub 直连不稳时配'],
+  ]],
+  ['常驻服务', [
+    ['serve.poll_seconds', '看网盘动态间隔（秒）', 'number'],
+    ['serve.full_scan_hour', '每天几点全量扫描', 'number'],
+    ['serve.port', '网页端口', 'number', '改了要重启服务才生效'],
+  ]],
+  ['其他', [
+    ['scan.keep_indexes', '网盘保留几个历史索引', 'number'],
+    ['rate_limit.list_per_sec', '列目录（次/秒）', 'number', '太快夸克会限流'],
+    ['rate_limit.upload_per_sec', '上传（次/秒）', 'number'],
+  ]],
+];
+let cfg = null;
+const getP = (o, p) => p.split('.').reduce((x, k) => x?.[k], o);
+const setP = (o, p, v) => { const ks = p.split('.'); const last = ks.pop(); ks.reduce((x, k) => x[k] ??= {}, o)[last] = v; };
+
+async function loadSettings() {
+  $('#settings').innerHTML = '<div class="empty">读取中…</div>';
+  try {
+    const c = await api('/api/config');
+    cfg = c.config;
+    $('#settings').innerHTML = `<div class="form">
+      <div class="group" id="updbox"></div>
+      <div class="group"><h3>片库目录</h3>
+        <table class="libs"><tr><th>网盘目录</th><th>类型</th><th>往网盘写什么</th><th></th></tr><tbody id="librows"></tbody></table>
+        <div class="row"><button onclick="addLib()">加一个目录</button><span class="meta">改了目录会马上重新扫描</span></div></div>
+      ${GROUPS.map(([title, fields]) => `<div class="group"><h3>${title}</h3>${fields.map(f => fieldHtml(f, c.env)).join('')}</div>`).join('')}
+      <div class="savebar"><button class="primary" onclick="saveSettings()">保存</button><button onclick="loadSettings()">放弃修改</button>
+        <span class="meta">保存到 ${esc(c.path)}（旧文件留一份 .bak，文件里的注释会丢）</span></div>
+    </div>`;
+    (cfg.libraries || []).forEach(addLib);
+    loadUpdate();
+  } catch (e) { $('#settings').innerHTML = `<div class="empty">${esc(e.message)}</div>`; }
+}
+function fieldHtml([path, label, type, hint, env], envs) {
+  const v = getP(cfg, path), id = 'f-' + path;
+  let input;
+  if (Array.isArray(type)) input = `<select id="${id}">${type.map(([k, n]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${n}</option>`).join('')}</select>`;
+  else if (type === 'bool') input = `<label><input type="checkbox" id="${id}" ${v ? 'checked' : ''}> 开</label>`;
+  else if (type === 'number') input = `<input type="number" step="any" id="${id}" value="${esc(v)}">`;
+  else input = `<input type="text" id="${id}" value="${esc(v ?? '')}" ${type === 'secret' ? 'autocomplete="off" placeholder="没填"' : ''} ${type === 'proxy' ? 'placeholder="http://127.0.0.1:7890"' : ''}>`;
+  const envNote = env && envs.includes(env) ? `<div class="hint" style="color:var(--warn)">环境变量 ${env} 已设置，实际用的是它，这里的不生效</div>` : '';
+  return `<div class="field"><label for="${id}">${label}</label>${input}${hint ? `<div class="hint">${esc(hint)}</div>` : ''}${envNote}</div>`;
+}
+function addLib(lib = { path: '', type: 'auto' }) {
+  const tr = document.createElement('tr');
+  tr.orig = lib;
+  tr.innerHTML = `<td><input class="lp" value="${esc(lib.path)}" placeholder="/电影"></td>
+    <td><select class="lt">${[['auto', '自动判断'], ['movie', '电影'], ['tv', '剧集']].map(([k, n]) => `<option value="${k}" ${k === lib.type ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
+    <td><select class="lo"><option value="">用默认值</option>${OUTPUT.map(([k, n]) => `<option value="${k}" ${k === lib.output ? 'selected' : ''}>${n}</option>`).join('')}</select></td>
+    <td><button class="danger" onclick="this.closest('tr').remove()">删</button></td>`;
+  $('#librows').appendChild(tr);
+}
+function saveSettings() {
+  const next = JSON.parse(JSON.stringify(cfg));
+  for (const [, fields] of GROUPS) for (const [path, , type] of fields) {
+    const el = document.getElementById('f-' + path);
+    if (type === 'bool') setP(next, path, el.checked);
+    else if (type === 'number') {
+      if (el.value === '' || isNaN(+el.value)) return toast('「' + el.closest('.field').querySelector('label').textContent + '」要填数字');
+      setP(next, path, +el.value);
+    }
+    else if (type === 'proxy') setP(next, path, el.value.trim() || null);
+    else setP(next, path, el.value.trim());
+  }
+  next.libraries = [...document.querySelectorAll('#librows tr')]
+    .map(tr => ({ ...tr.orig, path: tr.querySelector('.lp').value.trim(), type: tr.querySelector('.lt').value, output: tr.querySelector('.lo').value || null }))
+    .filter(l => l.path);
+  act(async () => {
+    const r = await api('/api/config', { config: next });
+    toast(r.warnings.length ? '已保存。' + r.warnings.join('；') : '已保存');
+    loadSettings();
+  });
+}
+
+async function loadUpdate() {
+  const box = $('#updbox');
+  if (!box) return;
+  const u = await api('/api/update');
+  const newer = u.latestCode && u.latestCode > u.currentCode;
+  box.innerHTML = `<h3>版本与更新</h3><div class="kv">
+    <div class="k">刮削器</div><div>${esc(u.version)}${u.managed
+      ? (u.selfUpdate ? (newer ? ' · <span style="color:var(--ok)">有新版本，会在空闲时自动更新</span>' : ' · 自动更新已开') : ' · 自动更新已关')
+      : ' · 从源码运行（开发版），不会自动更新'}</div>
+    <div class="k">GitHub 最新版</div><div>${u.latest ? esc(u.latest) + (u.publishedAt ? ' · 发布于 ' + day(u.publishedAt) : '') : '还没检查'}</div>
+    <div class="k">网盘里的 TV App</div><div>${u.mirrorApp ? (esc(u.appOnDrive) || '还没有') : '没开转存'}</div>
+    <div class="k">上次检查</div><div>${u.lastCheck ? new Date(u.lastCheck).toLocaleString('zh-CN') : '还没检查'}（每 ${u.checkHours} 小时一次）
+      ${u.error ? `<div style="color:var(--bad)">出错：${esc(u.error)}</div>` : ''}</div>
+  </div>
+  ${u.notes ? `<div class="notes">${esc(u.notes)}</div>` : ''}
+  <div class="row"><button onclick="checkUpdate()">立即检查</button></div>`;
+}
+function checkUpdate() {
+  act(() => api('/api/update/check', {}), '正在检查，稍等几秒');
+  setTimeout(() => loadUpdate().catch(() => {}), 4000);
+}
+
 async function refresh() {
   try {
     await loadStatus();
     if (tab === 'review') await loadReview();
+    if (tab === 'library') await loadLibrary();
     if (tab === 'renames') await loadRenames();
     if (tab === 'activity') await loadActivity();
   } catch (e) { $('#chips').innerHTML = `<span class="chip">连不上服务：${esc(e.message)}</span>`; }

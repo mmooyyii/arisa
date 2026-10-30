@@ -176,4 +176,23 @@ class ServiceTest {
         val last = File(e.root, ".arisa").listFiles()!!.filter { LibraryCodec.isIndexFile(it.name) }.maxBy { it.name }
         assertEquals(0, LibraryCodec.decode(last.readBytes()).items.size)
     }
+
+    @Test
+    fun pendingAndUndecideForWebPage() {
+        val e = env { ok() }
+        touch(e.root, "没看/漫长的季节 (2023)/E01.mkv")   // 规则自动识别
+        touch(e.root, "没看/乱码ΣΩ/xx.mkv")
+        assertEquals(null, e.service.pendingWorks(), "没扫描过")
+
+        e.service.submit(Service.Job.Scan(false, "测试"))
+        e.runAll()
+        assertEquals(listOf("没看/乱码ΣΩ/xx.mkv"), e.service.pendingWorks()!!.map { it.key })
+        assertEquals(1, e.service.library()!!.items.size)
+
+        // 认错了: 撤销后回到未识别, 并排一次扫描
+        e.service.undecide("没看/漫长的季节 (2023)")
+        assertTrue(e.service.store.load().entries.isEmpty())
+        assertEquals(2, e.service.pendingWorks()!!.size)
+        assertTrue(e.service.status().queued.isNotEmpty())
+    }
 }

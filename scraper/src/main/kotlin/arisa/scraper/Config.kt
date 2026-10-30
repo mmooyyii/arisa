@@ -152,9 +152,26 @@ data class Config(
     companion object {
         private val yaml = Yaml(configuration = YamlConfiguration(strictMode = false))
 
+        /** 写文件时只写和默认值不一样的项. */
+        private val yamlOut = Yaml(configuration = YamlConfiguration(strictMode = false, encodeDefaults = false))
+
+        /** 只读配置文件, 不合并环境变量 (网页上编辑用, 免得把环境变量里的 key 写进文件). */
+        fun loadFile(file: File): Config = if (file.exists()) yaml.decodeFromString(serializer(), file.readText()) else Config()
+
+        /** 写配置文件, 旧文件留一份 .bak. 文件里原来的注释会丢掉. */
+        fun save(file: File, config: Config) {
+            val text = "# 由管理网页保存, 字段说明见 config.example.yaml\n" + yamlOut.encodeToString(serializer(), config) + "\n"
+            yaml.decodeFromString(serializer(), text)   // 写出去的能读回来才写
+            file.parentFile.mkdirs()
+            if (file.exists()) file.copyTo(File(file.path + ".bak"), overwrite = true)
+            val tmp = File(file.path + ".tmp")
+            tmp.writeText(text)
+            check(tmp.renameTo(file)) { "写配置失败" }
+        }
+
         /** key 也可以用环境变量传, 优先级高于配置文件. */
         fun load(file: File, env: Map<String, String> = System.getenv()): Config {
-            val config = if (file.exists()) yaml.decodeFromString(serializer(), file.readText()) else Config()
+            val config = loadFile(file)
             return config.copy(
                 tmdb = config.tmdb.copy(apiKey = env["ARISA_TMDB_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.tmdb.apiKey),
                 agent = config.agent.copy(apiKey = env["ARISA_DEEPSEEK_API_KEY"]?.takeIf { it.isNotBlank() } ?: config.agent.apiKey),

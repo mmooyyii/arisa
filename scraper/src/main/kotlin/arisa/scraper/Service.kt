@@ -17,7 +17,7 @@ import java.util.concurrent.LinkedBlockingDeque
  */
 class Service(
     private val home: File,
-    private val configFile: File,
+    val configFile: File,
     private val state: StateStore,
     /** 测试时替换掉夸克. */
     driveFactory: ((Config) -> Drive)? = null,
@@ -71,6 +71,8 @@ class Service(
     @Volatile private var lastScan: String? = null
     @Volatile private var lastBuild: String? = null
     @Volatile private var lastReport: BuildReport? = null
+    /** 最近一次扫描, 网页上列「未识别」用. */
+    @Volatile private var lastScanResult: Scan? = null
     @Volatile private var pendingWorks: Int? = null
     private var costDay = ""
     @Volatile private var costToday = 0.0
@@ -83,7 +85,7 @@ class Service(
         configError = configError,
         lastScan = lastScan,
         lastBuild = lastBuild,
-        items = lastReport?.items,
+        items = lastReport?.items ?: localItemCount(),
         pendingVideos = lastReport?.pending,
         pendingWorks = pendingWorks,
         review = review.load().size,
@@ -180,7 +182,7 @@ class Service(
             saveWatch(watchState().copy(lastFullScan = java.time.LocalDate.now().toString()))
         }
         val scraper = scraper(config)
-        val scan = scraper.scan()
+        val scan = scraper.scan().also { lastScanResult = it }
         drive.save()
         lastScan = LocalDateTime.now().format(TIME)
         if (configError != null) {
@@ -251,7 +253,7 @@ class Service(
     private fun buildAll() {
         val scraper = scraper(config())
         if (configError != null) return log(configError!!)
-        val scan = scraper.scan()
+        val scan = scraper.scan().also { lastScanResult = it }
         drive.save()
         val left = scraper.pending(scan, store.load(), withCandidates = false)
         review.retain(left.mapTo(mutableSetOf()) { it.key })
@@ -296,6 +298,37 @@ class Service(
         log("确认 $path → $target${season?.let { " 第 $it 季" } ?: ""}")
         submit(Job.Build("确认了 $path"))
     }
+
+    /** 删掉一条映射 (认错了), 那些文件回到未识别, 下次扫描重新交给 AI. */
+    fun undecide(fid: String) {
+        val removed = store.load().entries[fid] ?: error("映射表里没有 $fid")
+        store.update { it.without(fid) }
+        log("撤销 ${removed.path} → ${removed.target}")
+        submit(Job.Scan(false, "撤销了 ${removed.path}"))
+    }
+
+    /** 还没识别的作品 (按最近一次扫描算), 没扫描过时是 null. */
+    fun pendingWorks(): List<PendingWork>? {
+        val scan = lastScanResult ?: return null
+        // 会读 NFO, 网页每几秒刷新一次, 扫描结果和映射表都没变时用上次算的
+        val mapping = store.load()
+        pendingCache?.takeIf { it.first === scan && it.second == mapping }?.let { return it.third }
+        return Scraper(config(), drive, null, null, null) {}.pending(scan, mapping, withCandidates = false)
+            .also { pendingCache = Triple(scan, mapping, it) }
+    }
+    @Volatile private var pendingCache: Triple<Scan, Mapping, List<PendingWork>>? = null
+
+    /** 刚启动还没生成过索引时, 作品数从本地那份片库读, 按修改时间缓存. */
+    private fun localItemCount(): Int? {
+        val f = File(home, "library.json.gz").takeIf { it.exists() } ?: return null
+        itemCountCache?.takeIf { it.first == f.lastModified() }?.let { return it.second }
+        return library()?.items?.size?.also { itemCountCache = f.lastModified() to it }
+    }
+    @Volatile private var itemCountCache: Pair<Long, Int>? = null
+
+    /** 最近一次生成的片库 (本地那份). */
+    fun library(): arisa.library.Library? =
+        File(home, "library.json.gz").takeIf { it.exists() }?.let { runCatching { arisa.library.LibraryCodec.decode(it.readBytes()) }.getOrNull() }
 
     /** 从待确认移出, 下次扫描重新交给 AI. */
     fun retry(key: String) {

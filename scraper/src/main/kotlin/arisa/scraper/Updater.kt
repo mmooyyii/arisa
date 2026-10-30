@@ -39,13 +39,31 @@ class Updater(
     /** 最近一次读到的最新版本, 给网页显示. */
     @Volatile var latest: ReleaseManifest? = null
         private set
+    /** 网盘里 TV App 的版本. */
+    @Volatile var appOnDrive: String? = null
+        private set
+    @Volatile var lastCheck: Long? = null
+        private set
+    @Volatile var lastError: String? = null
+        private set
+
+    /** 是 install.sh 装的 (从 ~/.arisa/versions 运行), 会自动更新; 否则是开发版. */
+    val managed get() = installDir?.parentFile?.canonicalFile == versions.canonicalFile
 
     /** 检查一次. [selfUpdate] / [mirrorApp] 对应配置里的开关. */
     fun check(selfUpdate: Boolean, mirrorApp: Boolean) {
-        val manifest = json.decodeFromString(ReleaseManifest.serializer(), String(get(manifestUrl)))
-        latest = manifest
-        if (mirrorApp) manifest.app?.let { mirrorApp(manifest, it) }
-        if (selfUpdate) manifest.scraper?.let { selfUpdate(manifest, it) }
+        lastCheck = System.currentTimeMillis()
+        try {
+            val text = try { String(get(manifestUrl)) } catch (e: NotFound) { error("GitHub 上还没有发布过版本") }
+            val manifest = json.decodeFromString(ReleaseManifest.serializer(), text)
+            latest = manifest
+            if (mirrorApp) manifest.app?.let { mirrorApp(manifest, it) }
+            if (selfUpdate) manifest.scraper?.let { selfUpdate(manifest, it) }
+            lastError = null
+        } catch (e: Exception) {
+            lastError = e.message ?: e.javaClass.simpleName
+            throw e
+        }
     }
 
     // ---------- TV App 转存到网盘 ----------
@@ -58,6 +76,7 @@ class Updater(
         val existing = files.firstOrNull { it.name == ReleaseManifest.FILE }?.let { f ->
             runCatching { json.decodeFromString(ReleaseManifest.serializer(), String(drive.download(f.fid))) }.getOrNull()
         }
+        appOnDrive = existing?.version
         if (existing != null && existing.versionCode >= manifest.versionCode && files.any { it.name == apk.name }) return
 
         log("转存 TV App ${manifest.version} 到网盘")
@@ -70,6 +89,7 @@ class Updater(
         // 旧 APK 只留上一个版本
         val oldApks = files.filter { it.name.endsWith(".apk") && it.name != apk.name }.sortedByDescending { it.updatedAt }.drop(1)
         drive.delete(oldApks.map { it.fid })
+        appOnDrive = manifest.version
         log("TV App ${manifest.version} 已转存到 /${LibraryCodec.DIR}/${ReleaseManifest.APP_DIR}/${apk.name}")
     }
 
@@ -77,7 +97,7 @@ class Updater(
 
     private fun selfUpdate(manifest: ReleaseManifest, zip: ReleaseAsset) {
         val dir = installDir
-        if (dir == null || dir.parentFile?.canonicalFile != versions.canonicalFile) return
+        if (dir == null || !managed) return
         if (manifest.versionCode <= ReleaseManifest.versionCode(current)) return
 
         val target = File(versions, manifest.version)
@@ -118,6 +138,7 @@ class Updater(
 
     private fun get(url: String): ByteArray =
         http().newCall(Request.Builder().url(url).header("User-Agent", "arisa-scraper/$current").build()).execute().use { r ->
+            if (r.code == 404) throw NotFound(url)
             if (!r.isSuccessful) error("下载失败 HTTP ${r.code}: $url")
             r.body!!.bytes()
         }
@@ -128,6 +149,8 @@ class Updater(
         check(bytes.size.toLong() == asset.size && sha == asset.sha256) { "${asset.name} 校验失败 (大小 ${bytes.size}, sha256 $sha)" }
         return bytes
     }
+
+    private class NotFound(url: String) : IllegalStateException("下载失败 HTTP 404: $url")
 
     companion object {
         /** 编译时写进去的版本号, 开发版是 0.0.0-dev. */

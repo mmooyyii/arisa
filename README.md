@@ -51,6 +51,15 @@ scraper/build/install/arisa-scraper/bin/arisa-scraper serve
 4. 按映射表生成 `/.arisa/library-*.json.gz` 和 NFO, 生成改名计划.
 5. 待确认和改名在管理网页上处理, 不发通知.
 
+管理网页 (http://localhost:7893, 只在局域网用, 没有密码):
+
+- 待确认: AI 拿不准的作品, 搜 TMDB 点一下就定
+- 片库: 已识别的作品和对应的网盘目录, 认错了可以改成别的或撤销; 未识别的直接手动认; 跳过的可以撤销
+- 改名 / 动态: 改名计划和最近的日志
+- 设置: 片库目录、TMDB / DeepSeek key、代理、输出模式、自动更新等, 存回 `~/.arisa/config.yaml`
+- 版本与更新: 当前版本、GitHub 最新版、网盘里的 TV App 版本, 可以马上检查一次
+- 夸克登录失效时页面上直接扫码重新登录
+
 日本动画的片名用 Bangumi (bgm.tv) 的中文名, 按原名和年份自动匹配, 匹配不对时在映射里用 `--bangumi ID` 指定.
 
 识别结论存在映射表 (fid → TMDB 作品), 本地 `~/.arisa/mapping.json`, 网盘 `/.arisa/mapping.json` 备份.

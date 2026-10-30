@@ -67,6 +67,10 @@ data class MediaItem(
     val year: Int? = null,
     val overview: String? = null,
     val genres: List<String> = emptyList(),
+    /** 出品国家/地区, ISO 3166 代码, 如 "CN" "US". */
+    val countries: List<String> = emptyList(),
+    /** 原始语言, ISO 639-1 代码, 如 "zh" "ja". */
+    val language: String? = null,
     /** TMDB 评分, 0~10. */
     val rating: Double? = null,
     /** 分钟. */

@@ -45,27 +45,30 @@ import androidx.tv.material3.Text
 import kotlinx.coroutines.delay
 import arisa.app.ArisaApp
 import arisa.app.data.LibraryRepository
-import arisa.library.Library
-import arisa.library.MediaCollection
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.tv.material3.Card
+import androidx.tv.material3.CardDefaults
+import arisa.library.BrowseFilter
+import arisa.library.BrowseSort
+import arisa.library.LibraryBrowser
+import arisa.library.LibraryBrowser.Card
 import arisa.library.MediaItem
 import arisa.library.MediaType
 import arisa.library.tmdbImage
 
-/**
- * 首页的一张海报: 单部作品, 或者一个合集.
- * 合集用封面作品的图和信息, 片名换成合集名, 加入时间取最近加入的那部.
- */
-private data class Entry(val item: MediaItem, val collection: MediaCollection? = null) {
-    val key get() = collection?.id ?: item.id
-}
+/** 首页的一行. 卡片最多 [SHELF_LIMIT] 张, 更多的话行尾放「全部」卡片, 点进片库页并带上 [filter]. */
+private data class Shelf(val title: String, val filter: BrowseFilter, val cards: List<Card>, val total: Int)
 
-private data class Shelf(val title: String, val entries: List<Entry>)
+private const val SHELF_LIMIT = 20
 
 @Composable
 fun HomeScreen(
     onOpen: (String) -> Unit,
     onOpenCollection: (String) -> Unit,
     onPlay: (itemId: String, fid: String) -> Unit,
+    onBrowse: (BrowseFilter) -> Unit,
     onSearch: () -> Unit,
     onSettings: () -> Unit,
 ) {
@@ -82,7 +85,7 @@ fun HomeScreen(
     }
 
     val continueWatching = remember(lib, progress) { app.progress.continueWatching(lib, progress) }
-    val shelves = remember(lib) { buildShelves(entries(lib)) }
+    val shelves = remember(lib) { buildShelves(LibraryBrowser(lib)) }
 
     // 记住最后聚焦的卡片 ("行:作品"), 从详情页返回时焦点回到那里, 不回第一个
     var lastFocus by rememberSaveable { mutableStateOf<String?>(null) }
@@ -118,7 +121,7 @@ fun HomeScreen(
         Backdrop(hero)
 
         Column(Modifier.fillMaxSize()) {
-            TopBar(onSearch, onSettings, status)
+            TopBar(onBrowse = { onBrowse(BrowseFilter()) }, onSearch, onSettings, status)
             focused?.let { HeroInfo(it, Modifier.padding(start = 56.dp, end = 56.dp).height(220.dp)) }
             Spacer(Modifier.height(12.dp))
 
@@ -162,24 +165,33 @@ fun HomeScreen(
                     }
                 }
                 shelves.forEachIndexed { index, shelf ->
-                    item(key = shelf.title) {
+                    item(key = shelf.filter.toString()) {
                         Column {
                             SectionTitle(shelf.title, Modifier.padding(start = 56.dp))
                             LazyRow(
                                 contentPadding = PaddingValues(horizontal = 56.dp),
                                 horizontalArrangement = Arrangement.spacedBy(18.dp),
                             ) {
-                                items(shelf.entries, key = { it.key }) { entry ->
-                                    val isFirst = continueWatching.isEmpty() && index == 0 && entry == shelf.entries.first()
-                                    val c = entry.collection
+                                items(shelf.cards, key = { it.key }) { card ->
+                                    val isFirst = continueWatching.isEmpty() && index == 0 && card == shelf.cards.first()
+                                    val c = card as? Card.Collection
                                     PosterCard(
-                                        item = entry.item,
-                                        onClick = { if (c != null) onOpenCollection(c.id) else onOpen(entry.item.id) },
-                                        badge = c?.let { "合集 · ${it.items.size} 部" },
+                                        item = card.item,
+                                        onClick = { if (c != null) onOpenCollection(c.collection.id) else onOpen(card.item.id) },
+                                        badge = c?.let { "合集 · ${it.members.size} 部" },
                                         modifier = Modifier
-                                            .track("${shelf.title}:${entry.key}", isFirst)
-                                            .onFocusChanged { if (it.hasFocus) focused = entry.item },
+                                            .track("${shelf.title}:${card.key}", isFirst)
+                                            .onFocusChanged { if (it.hasFocus) focused = card.item },
                                     )
+                                }
+                                if (shelf.total > shelf.cards.size) {
+                                    item(key = "more") {
+                                        MoreCard(
+                                            total = shelf.total,
+                                            onClick = { onBrowse(shelf.filter) },
+                                            modifier = Modifier.track("${shelf.title}:more", isFirst = false),
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -220,7 +232,7 @@ fun HomeScreen(
 }
 
 @Composable
-private fun TopBar(onSearch: () -> Unit, onSettings: () -> Unit, status: LibraryRepository.Status) {
+private fun TopBar(onBrowse: () -> Unit, onSearch: () -> Unit, onSettings: () -> Unit, status: LibraryRepository.Status) {
     Row(
         Modifier.fillMaxWidth().padding(start = 56.dp, end = 56.dp, top = 28.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -230,6 +242,10 @@ private fun TopBar(onSearch: () -> Unit, onSettings: () -> Unit, status: Library
         }
         Spacer(Modifier.weight(1f))
         val colors = ButtonDefaults.colors(containerColor = androidx.compose.ui.graphics.Color.White.copy(alpha = 0.08f))
+        Button(onClick = onBrowse, colors = colors, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
+            Text("片库", style = MaterialTheme.typography.labelMedium)
+        }
+        Spacer(Modifier.width(12.dp))
         Button(onClick = onSearch, colors = colors, contentPadding = PaddingValues(horizontal = 16.dp, vertical = 6.dp)) {
             Text("搜索", style = MaterialTheme.typography.labelMedium)
         }
@@ -281,27 +297,44 @@ private fun EmptyState(status: LibraryRepository.Status, onSettings: () -> Unit)
     }
 }
 
-/** 合集里的作品收成一张合集海报, 其余作品各一张. */
-private fun entries(lib: Library): List<Entry> {
-    val byId = lib.items.associateBy { it.id }
-    val inCollection = HashSet<String>()
-    val collections = lib.collections.mapNotNull { c ->
-        val members = c.items.mapNotNull(byId::get)
-        val cover = byId[c.cover] ?: members.firstOrNull() ?: return@mapNotNull null
-        members.mapTo(inCollection) { it.id }
-        Entry(cover.copy(title = c.name, addedAt = members.maxOf { it.addedAt }), c)
+/** 行尾的「全部」卡片, 和海报一样大. */
+@Composable
+private fun MoreCard(total: Int, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Card(
+        onClick = onClick,
+        modifier = modifier.width(120.dp).aspectRatio(2f / 3f),
+        shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
+        colors = CardDefaults.colors(containerColor = Color.White.copy(alpha = 0.08f)),
+        scale = CardDefaults.scale(focusedScale = 1.08f),
+    ) {
+        Column(Modifier.fillMaxSize(), verticalArrangement = Arrangement.Center, horizontalAlignment = Alignment.CenterHorizontally) {
+            Text("全部", style = MaterialTheme.typography.titleMedium)
+            Spacer(Modifier.height(4.dp))
+            Text("$total 部", style = MaterialTheme.typography.labelMedium)
+        }
     }
-    return lib.items.filter { it.id !in inCollection }.map { Entry(it) } + collections
 }
 
-private fun buildShelves(entries: List<Entry>): List<Shelf> = buildList {
-    if (entries.isEmpty()) return@buildList
-    add(Shelf("最近添加", entries.sortedByDescending { it.item.addedAt }.take(20)))
-    entries.filter { it.item.type == MediaType.MOVIE }.takeIf { it.isNotEmpty() }?.let { add(Shelf("电影", it.sortedByDescending { m -> m.item.addedAt })) }
-    entries.filter { it.item.type == MediaType.TV }.takeIf { it.isNotEmpty() }?.let { add(Shelf("剧集", it.sortedByDescending { m -> m.item.addedAt })) }
-    // 数量最多的几个类型各一行
-    entries.flatMap { it.item.genres }.groupingBy { it }.eachCount().entries
-        .sortedByDescending { it.value }.filter { it.value >= 3 }.take(4)
-        .forEach { (genre, _) -> add(Shelf(genre, entries.filter { genre in it.item.genres }.sortedByDescending { it.item.rating ?: 0.0 })) }
-    entries.filter { (it.item.rating ?: 0.0) >= 8.0 }.takeIf { it.size >= 3 }?.let { add(Shelf("高分", it.sortedByDescending { m -> m.item.rating })) }
+/**
+ * 首页的分类行. 规则和片库页一样 (同一合集两部以上合成一张), 「全部」点进去看到的就是这一行的完整内容.
+ * 和整个片库一样的行 (比如全是电影时的「电影」) 不重复列.
+ */
+private fun buildShelves(b: LibraryBrowser): List<Shelf> = buildList {
+    val all = b.count(BrowseFilter())
+    if (all == 0) return@buildList
+    fun shelf(title: String, f: BrowseFilter, skipIfAll: Boolean = true) {
+        if (skipIfAll && b.count(f) == all) return
+        val cards = b.cards(f)
+        if (cards.isNotEmpty()) add(Shelf(title, f, cards.take(SHELF_LIMIT), cards.size))
+    }
+    shelf("最近添加", BrowseFilter(), skipIfAll = false)
+    shelf("电影", BrowseFilter(type = MediaType.MOVIE))
+    shelf("剧集", BrowseFilter(type = MediaType.TV))
+    // 有两个以上地区片子够多时才按地区分
+    b.regions(BrowseFilter()).filter { it.second >= 8 }.takeIf { it.size >= 2 }
+        ?.forEach { (r, _) -> shelf(r.label, BrowseFilter(region = r)) }
+    // 片子最多的三个类型, 按评分排
+    b.genres(BrowseFilter()).filter { it.second >= 3 }.take(3)
+        .forEach { (g, _) -> shelf(g, BrowseFilter(genre = g, sort = BrowseSort.RATING)) }
+    shelf("评分最高", BrowseFilter(sort = BrowseSort.RATING), skipIfAll = false)
 }

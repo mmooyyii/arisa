@@ -12,6 +12,7 @@
     "科幻",
     "冒险"
    ],
+   "language": "en",
    "rating": 8.1,
    "runtime": 166,
    "certification": "PG13",
@@ -95,6 +96,7 @@
     "科幻",
     "冒险"
    ],
+   "language": "en",
    "rating": 7.8,
    "runtime": 156,
    "certification": "PG13",
@@ -179,6 +181,7 @@
     "剧情",
     "科幻"
    ],
+   "language": "en",
    "rating": 8.5,
    "runtime": 169,
    "certification": "PG13",
@@ -263,6 +266,7 @@
     "科幻",
     "犯罪"
    ],
+   "language": "en",
    "rating": 8.4,
    "runtime": 148,
    "certification": "PG",
@@ -347,6 +351,7 @@
     "惊悚",
     "犯罪"
    ],
+   "language": "en",
    "rating": 8.5,
    "runtime": 152,
    "certification": "PG",
@@ -431,6 +436,7 @@
     "历史",
     "战争"
    ],
+   "language": "en",
    "rating": 8.0,
    "runtime": 181,
    "certification": "M18",
@@ -514,6 +520,7 @@
     "动作",
     "科幻"
    ],
+   "language": "en",
    "rating": 8.3,
    "runtime": 136,
    "certification": "PG",
@@ -597,6 +604,7 @@
     "科幻",
     "剧情"
    ],
+   "language": "en",
    "rating": 7.6,
    "runtime": 164,
    "certification": "R",
@@ -681,6 +689,7 @@
     "家庭",
     "奇幻"
    ],
+   "language": "ja",
    "rating": 8.5,
    "runtime": 125,
    "certification": "G",
@@ -765,6 +774,7 @@
     "惊悚",
     "剧情"
    ],
+   "language": "ko",
    "rating": 8.5,
    "runtime": 132,
    "certification": "M18",
@@ -849,6 +859,7 @@
     "剧情",
     "爱情"
    ],
+   "language": "en",
    "rating": 8.5,
    "runtime": 142,
    "certification": "PG-13",
@@ -933,6 +944,7 @@
     "犯罪",
     "喜剧"
    ],
+   "language": "en",
    "rating": 8.5,
    "runtime": 154,
    "certification": "R21",
@@ -1016,6 +1028,7 @@
     "剧情",
     "犯罪"
    ],
+   "language": "en",
    "rating": 9.0,
    "certification": "M18",
    "poster": "/rqliuvX7NdknSHu5qaSDfESplQi.jpg",
@@ -1207,10 +1220,13 @@
    "year": 2011,
    "overview": "改编自乔治·R·R·马丁的奇幻小说系列《冰与火之歌》。维斯特洛大陆上，七大贵族家族为争夺铁王座展开斗争。权谋、战争与背叛不断交织，各方势力为统治七大王国展开生死较量。",
    "genres": [
-    "科幻奇幻",
+    "科幻",
+    "奇幻",
     "剧情",
-    "动作冒险"
+    "动作",
+    "冒险"
    ],
+   "language": "en",
    "rating": 8.5,
    "certification": "R21",
    "poster": "/38mXOIoDceMzlcbuNClVnVYvSiY.jpg",
@@ -1450,10 +1466,13 @@
    "overview": "打倒了魔王的勇者一行人的后日谈——在“那之后”的故事。身为魔法使的芙莉莲是一位精灵，她和另外三人有着不一样的地方。对于生活在“之后”的世界、感受到的事情有着不一样的看法……残存世间的人们所编织的，葬送与祈祷相伴的故事——从“冒险的结束”开始了。",
    "genres": [
     "动画",
-    "动作冒险",
+    "动作",
+    "冒险",
     "剧情",
-    "科幻奇幻"
+    "科幻",
+    "奇幻"
    ],
+   "language": "ja",
    "rating": 8.8,
    "certification": "NC16",
    "poster": "/1TtrtRIwXz5BB0gXEl8zgBypl9c.jpg",
@@ -1693,10 +1712,13 @@
    "year": 2022,
    "overview": "在维斯特洛大陆，坦格利安家族的衰落被公之于众。一场被称为“血龙狂舞”的内战即将爆发。",
    "genres": [
-    "科幻奇幻",
+    "科幻",
+    "奇幻",
     "剧情",
-    "动作冒险"
+    "动作",
+    "冒险"
    ],
+   "language": "en",
    "rating": 8.4,
    "certification": "R21",
    "poster": "/w5iFwPk6h9fv3zxLN2QkxVEVyBw.jpg",
@@ -1932,6 +1954,7 @@
    "genres": [
     "剧情"
    ],
+   "language": "en",
    "rating": 8.4,
    "certification": "R21",
    "poster": "/ydyTjqxZsPlcFSTBNY2INYrmEvk.jpg",

@@ -19,6 +19,8 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.ui.Modifier
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import arisa.library.BrowseFilter
+import arisa.app.ui.BrowseScreen
 import arisa.app.ui.CollectionScreen
 import arisa.app.ui.DetailScreen
 import arisa.app.ui.HomeScreen
@@ -34,6 +36,7 @@ sealed interface Screen {
     data class Detail(val id: String) : Screen
     data class Collection(val id: String) : Screen
     data class Search(val query: String = "") : Screen
+    data class Browse(val filter: BrowseFilter = BrowseFilter()) : Screen
     data object Settings : Screen
 }
 
@@ -93,6 +96,7 @@ class MainActivity : ComponentActivity() {
                 onOpen = { stack += Screen.Detail(it) },
                 onOpenCollection = { stack += Screen.Collection(it) },
                 onPlay = { item, fid -> play(item, fid, false) },
+                onBrowse = { stack += Screen.Browse(it) },
                 onSearch = { stack += Screen.Search() },
                 onSettings = { stack += Screen.Settings },
             )
@@ -107,6 +111,11 @@ class MainActivity : ComponentActivity() {
                 onOpen = { stack += Screen.Detail(it) },
                 onOpenCollection = { stack += Screen.Collection(it) },
                 onPlay = { fid -> play("", fid, false) },
+            )
+            is Screen.Browse -> BrowseScreen(
+                screen.filter,
+                onOpen = { stack += Screen.Detail(it) },
+                onOpenCollection = { stack += Screen.Collection(it) },
             )
             Screen.Settings -> SettingsScreen(onLogout = onLogout)
         } }

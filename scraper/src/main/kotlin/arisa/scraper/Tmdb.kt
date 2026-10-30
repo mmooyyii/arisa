@@ -190,6 +190,7 @@ class Tmdb(
         @SerialName("content_ratings") val contentRatings: ContentRatings? = null,
         @SerialName("original_language") val originalLanguage: String? = null,
         @SerialName("origin_country") val originCountry: List<String> = emptyList(),
+        @SerialName("production_countries") val productionCountries: List<Country> = emptyList(),
     ) {
         val displayTitle get() = title ?: name ?: ""
         val displayOriginal get() = originalTitle ?: originalName
@@ -210,6 +211,9 @@ class Tmdb(
 
     @Serializable
     data class Creator(val name: String)
+
+    @Serializable
+    data class Country(@SerialName("iso_3166_1") val code: String)
 
     /** 电影放在 titles, 剧集放在 results. */
     @Serializable

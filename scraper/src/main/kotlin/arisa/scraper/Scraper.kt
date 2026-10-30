@@ -476,7 +476,9 @@ class Scraper(
                 .filter { it.isNotEmpty() && it != d.displayTitle && it != d.displayOriginal }.distinct().take(10),
             year = d.year,
             overview = d.overview?.takeIf { it.isNotBlank() },
-            genres = d.genres.map { GENRE_ZH[it.name] ?: it.name },
+            genres = d.genres.flatMap { GENRE_ZH[it.name] ?: listOf(it.name) }.distinct(),
+            countries = d.originCountry.ifEmpty { d.productionCountries.map { it.code } }.distinct(),
+            language = d.originalLanguage,
             rating = d.voteAverage?.takeIf { it > 0 }?.let { Math.round(it * 10) / 10.0 },
             runtime = d.runtime ?: d.episodeRunTime.firstOrNull(),
             certification = certification,
@@ -732,16 +734,19 @@ class Scraper(
         /** 别名只收这些地区的: 两岸三地和新加坡的中文译名, 英文名, 日文名. */
         val ALIAS_COUNTRIES = setOf("CN", "TW", "HK", "SG", "US", "GB", "JP")
 
-        /** TMDB 剧集类型有几个没有中文翻译. */
+        /**
+         * TMDB 剧集类型有几个没有中文翻译, 还有几个是两个类型合在一起的 (Sci-Fi & Fantasy),
+         * 拆成和电影一样的类型, 按类型筛选时电影和剧集才能放在一起.
+         */
         val GENRE_ZH = mapOf(
-            "Sci-Fi & Fantasy" to "科幻奇幻",
-            "Action & Adventure" to "动作冒险",
-            "War & Politics" to "战争政治",
-            "Kids" to "儿童",
-            "News" to "新闻",
-            "Reality" to "真人秀",
-            "Soap" to "肥皂剧",
-            "Talk" to "脱口秀",
+            "Sci-Fi & Fantasy" to listOf("科幻", "奇幻"),
+            "Action & Adventure" to listOf("动作", "冒险"),
+            "War & Politics" to listOf("战争", "政治"),
+            "Kids" to listOf("儿童"),
+            "News" to listOf("新闻"),
+            "Reality" to listOf("真人秀"),
+            "Soap" to listOf("肥皂剧"),
+            "Talk" to listOf("脱口秀"),
         )
     }
 }

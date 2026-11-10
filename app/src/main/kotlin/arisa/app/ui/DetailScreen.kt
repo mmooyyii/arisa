@@ -61,6 +61,7 @@ import arisa.library.MediaFile
 import arisa.library.MediaItem
 import arisa.library.MediaType
 import arisa.library.PlaybackProgress
+import arisa.library.WatchState
 import arisa.library.tmdbImage
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -155,12 +156,29 @@ fun DetailScreen(
                                     }
                                 }
                             }
+                            // 手动标记: 整部电影, 或者剧集的全部集数 (单集在下面的卡片上长按)
+                            if (targetFid != null) {
+                                val watched = remember(item, progress) { WatchState.of(item, progress) } == WatchState.Watched
+                                Button(
+                                    onClick = {
+                                        val files = if (item.type == MediaType.MOVIE) listOf(item.files) else episodes.map { it.files }.filter { it.isNotEmpty() }
+                                        app.progress.mark(files, watched = !watched)
+                                        app.syncProgress(onlyIfDirty = true)
+                                    },
+                                    colors = secondaryButton(),
+                                ) { Text(if (watched) "标为未看" else if (item.type == MediaType.TV) "全部标为已看" else "标为已看") }
+                            }
                         }
                     }
                 }
 
                 if (item.type == MediaType.TV && item.seasons.isNotEmpty()) {
-                    item(key = "episodes") { EpisodesSection(item, progress, resume.first, onPlay) }
+                    item(key = "episodes") {
+                        EpisodesSection(item, progress, resume.first, onPlay, onMark = { ep, watched ->
+                            app.progress.mark(listOf(ep.files), watched)
+                            app.syncProgress(onlyIfDirty = true)
+                        })
+                    }
                 }
 
                 if (item.cast.isNotEmpty()) {
@@ -209,6 +227,7 @@ private fun EpisodesSection(
     progress: Map<String, PlaybackProgress>,
     current: Episode?,
     onPlay: (String, Boolean) -> Unit,
+    onMark: (Episode, watched: Boolean) -> Unit,
 ) {
     var seasonIndex by remember(item.id) {
         mutableIntStateOf(item.seasons.indexOfFirst { it.number == current?.season }.coerceAtLeast(0))
@@ -232,17 +251,20 @@ private fun EpisodesSection(
         } else {
             SectionTitle(season.name ?: "第 ${season.number} 季")
         }
+        Text("长按确定键: 标为已看 / 未看", style = MaterialTheme.typography.labelSmall, color = Palette.TextTertiary, modifier = Modifier.padding(bottom = 10.dp))
         LazyRow(state = rowState, horizontalArrangement = Arrangement.spacedBy(20.dp)) {
             items(season.episodes, key = { "${it.season}-${it.episode}-${it.files.first().fid}" }) { ep ->
-                val p = ep.files.firstNotNullOfOrNull { progress[it.fid] }
+                // 有看完的版本就按看完算, 否则取最近看的那个版本
+                val p = ep.files.mapNotNull { progress[it.fid] }.let { all -> all.firstOrNull { it.finished } ?: all.maxByOrNull { it.updatedAt } }
                 LandscapeCard(
                     imageUrl = tmdbImage(ep.still ?: item.backdrop, "w780"),
                     blurHash = if (ep.still == null) item.art.backdropBlurHash else null,
                     title = "${ep.episode}. ${ep.title ?: "第 ${ep.episode} 集"}",
                     subtitle = listOfNotNull(ep.runtime?.let { "$it 分钟" }, ep.airDate, if (p?.finished == true) "已看完" else null)
                         .joinToString("  ·  ").ifEmpty { null },
-                    progress = p?.takeIf { !it.finished }?.let { it.positionMs.toFloat() / it.durationMs.coerceAtLeast(1) },
+                    progress = p?.takeIf { !it.finished && it.positionMs > 0 }?.let { it.positionMs.toFloat() / it.durationMs.coerceAtLeast(1) },
                     onClick = { onPlay(ep.files.first().fid, false) },
+                    onLongClick = { onMark(ep, p?.finished != true) },
                     width = 232.dp,
                     fallback = parseColor(item.art.color),
                 )

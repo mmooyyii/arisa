@@ -25,6 +25,8 @@ import arisa.library.MediaItem
 import arisa.library.MediaType
 import arisa.library.PlaybackProgress
 import arisa.library.ProgressSync
+import arisa.library.MediaFile
+import arisa.library.WatchMark
 
 /**
  * 观看进度, key = 文件 fid. 本地存一份, 网盘 /.arisa/progress-<设备ID>.json 存一份, 多台设备靠它同步:
@@ -62,6 +64,16 @@ class ProgressStore(context: Context) {
         version.incrementAndGet()
         dirty = true
         if (flush) persist() else writer.launch { persist() }
+    }
+
+    /** 手动标记已看 / 未看. [files]: 每一集 (电影就是一项) 的各个版本, 按集数顺序. 规则见 [WatchMark]. */
+    fun mark(files: List<List<MediaFile>>, watched: Boolean) {
+        val marks = WatchMark.mark(files, watched, _all.value, System.currentTimeMillis())
+        if (marks.isEmpty()) return
+        _all.update { it + marks }
+        version.incrementAndGet()
+        dirty = true
+        persist()
     }
 
     /** 加锁: 主线程、后台存盘、同步都会调, 保证后存的不比先存的旧. */

@@ -76,6 +76,7 @@ import coil3.compose.rememberAsyncImagePainter
 import arisa.library.MediaFile
 import arisa.library.MediaItem
 import arisa.library.MediaType
+import arisa.library.WatchState
 import arisa.library.tmdbImage
 
 /** BlurHash 占位 + 大图淡入. */
@@ -294,9 +295,16 @@ private fun focusBorder() = CardDefaults.border(
 )
 
 
-/** 竖版海报卡片. [badge] 显示在左下角, 合集用来标出有几部. */
+/** 竖版海报卡片. [badge] 显示在左下角, 合集用来标出有几部. [watch]: 右上角的已看标记、底部的进度条. */
 @Composable
-fun PosterCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifier, width: Dp = 120.dp, badge: String? = null) {
+fun PosterCard(
+    item: MediaItem,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    width: Dp = 120.dp,
+    badge: String? = null,
+    watch: WatchState = WatchState.Unwatched,
+) {
     Card(
         onClick = onClick,
         modifier = modifier.width(width).aspectRatio(2f / 3f),
@@ -326,6 +334,35 @@ fun PosterCard(item: MediaItem, onClick: () -> Unit, modifier: Modifier = Modifi
                 )
             }
         }
+        WatchMarker(watch)
+    }
+}
+
+/** 海报上的观看状态: 看完了打勾, 剧集没看完的标还剩几集, 电影看了一半的在底边画进度. 没看过的不标. */
+@Composable
+private fun WatchMarker(watch: WatchState) {
+    val label = when (watch) {
+        WatchState.Watched -> "✓"
+        is WatchState.Remaining -> "剩 ${watch.remaining} 集"
+        else -> null
+    }
+    if (label != null) {
+        Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.TopEnd) {
+            Text(
+                label,
+                style = MaterialTheme.typography.labelSmall,
+                color = if (watch == WatchState.Watched) Palette.Accent else Palette.Text,
+                modifier = Modifier
+                    .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
+                    .padding(horizontal = 6.dp, vertical = 2.dp),
+            )
+        }
+    }
+    if (watch is WatchState.InProgress) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.BottomStart) {
+            Box(Modifier.fillMaxWidth().height(3.dp).background(Color.Black.copy(alpha = 0.5f)))
+            Box(Modifier.fillMaxWidth(watch.fraction.coerceIn(0f, 1f)).height(3.dp).background(Palette.Accent))
+        }
     }
 }
 
@@ -341,10 +378,12 @@ fun LandscapeCard(
     modifier: Modifier = Modifier,
     width: Dp = 260.dp,
     fallback: Color = Palette.Surface,
+    onLongClick: (() -> Unit)? = null,
 ) {
     Column(modifier.width(width)) {
         Card(
             onClick = onClick,
+            onLongClick = onLongClick,
             modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
             shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
             scale = CardDefaults.scale(focusedScale = 1.05f),

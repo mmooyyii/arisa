@@ -32,11 +32,13 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import arisa.app.ArisaApp
+import arisa.library.WatchState
 
 /** 合集: 同一个顶层目录里的几部作品, 按年份排. */
 @Composable
 fun CollectionScreen(id: String, onOpen: (String) -> Unit) {
     val app = ArisaApp.instance
+    val progress by app.progress.all.collectAsStateWithLifecycle()
     val library by app.library.library.collectAsStateWithLifecycle()
     val collection = remember(library, id) { app.library.collection(id) } ?: return
     val items = remember(library, collection) { collection.items.mapNotNull(app.library::item) }
@@ -73,6 +75,7 @@ fun CollectionScreen(id: String, onOpen: (String) -> Unit) {
                             item = item,
                             onClick = { onOpen(item.id) },
                             width = 140.dp,
+                            watch = remember(item, progress) { WatchState.of(item, progress) },
                             modifier = Modifier
                                 .then(if (item == items.first()) Modifier.focusRequester(first) else Modifier)
                                 .then(if (item.id == restoreKey) Modifier.focusRequester(restore) else Modifier)

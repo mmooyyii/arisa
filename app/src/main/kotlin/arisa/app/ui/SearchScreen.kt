@@ -38,6 +38,7 @@ import androidx.tv.material3.Text
 import arisa.app.ArisaApp
 import arisa.library.LibrarySearch
 import arisa.library.LibrarySearch.Hit
+import arisa.library.WatchState
 
 /** 按片名、原名、别名、合集名、演员、导演、类型、年份搜, 支持拼音和首字母; 也能搜到未识别的文件. */
 @Composable
@@ -49,6 +50,7 @@ fun SearchScreen(
 ) {
     val app = ArisaApp.instance
     val library by app.library.library.collectAsStateWithLifecycle()
+    val progress by app.progress.all.collectAsStateWithLifecycle()
     var query by rememberSaveable { mutableStateOf(initialQuery) }
     var inputFocused by remember { mutableStateOf(false) }
     val focus = remember { FocusRequester() }
@@ -103,11 +105,18 @@ fun SearchScreen(
                 span = { if (it is Hit.File) GridItemSpan(2) else GridItemSpan(1) },
             ) { hit ->
                 when (hit) {
-                    is Hit.Item -> PosterCard(hit.item, onClick = { onOpen(hit.item.id) })
+                    is Hit.Item -> PosterCard(
+                        hit.item,
+                        onClick = { onOpen(hit.item.id) },
+                        watch = remember(hit.item, progress) { WatchState.of(hit.item, progress) },
+                    )
                     is Hit.Collection -> PosterCard(
                         hit.cover.copy(title = hit.collection.name),
                         onClick = { onOpenCollection(hit.collection.id) },
                         badge = "合集 · ${hit.collection.items.size} 部",
+                        watch = remember(hit.collection, progress) {
+                            WatchState.of(hit.collection.items.mapNotNull(app.library::item), progress)
+                        },
                     )
                     is Hit.File -> LandscapeCard(
                         imageUrl = null,

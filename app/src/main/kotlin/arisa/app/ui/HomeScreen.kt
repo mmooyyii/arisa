@@ -57,6 +57,8 @@ import arisa.library.LibraryBrowser
 import arisa.library.LibraryBrowser.Card
 import arisa.library.MediaItem
 import arisa.library.MediaType
+import arisa.library.PlaybackProgress
+import arisa.library.WatchState
 import arisa.library.tmdbImage
 
 /** 首页的一行. 卡片最多 [SHELF_LIMIT] 张, 更多的话行尾放「全部」卡片, 点进片库页并带上 [filter]. */
@@ -175,6 +177,7 @@ fun HomeScreen(
                                         item = card.item,
                                         onClick = { if (c != null) onOpenCollection(c.collection.id) else onOpen(card.item.id) },
                                         badge = c?.let { "合集 · ${it.members.size} 部" },
+                                        watch = remember(card, progress) { watchOf(card, progress) },
                                         modifier = Modifier
                                             .track("${shelf.title}:${card.key}", isFirst)
                                             .onFocusChanged { if (it.hasFocus) focused = card.item },
@@ -305,6 +308,10 @@ private fun EmptyState(status: LibraryRepository.Status, onSettings: () -> Unit)
         }
     }
 }
+
+/** 卡片上的观看状态: 合集看里面的全部作品. */
+fun watchOf(card: Card, progress: Map<String, PlaybackProgress>): WatchState =
+    if (card is Card.Collection) WatchState.of(card.members, progress) else WatchState.of(card.item, progress)
 
 /** 行尾的「全部」卡片, 和海报一样大. */
 @Composable

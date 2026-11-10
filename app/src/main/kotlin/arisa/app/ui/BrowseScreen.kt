@@ -58,6 +58,7 @@ fun BrowseScreen(initial: BrowseFilter, onOpen: (String) -> Unit, onOpenCollecti
     val app = ArisaApp.instance
     val library by app.library.library.collectAsStateWithLifecycle()
     val lib = library ?: return
+    val progress by app.progress.all.collectAsStateWithLifecycle()
     val browser = remember(lib) { app.library.browser() ?: LibraryBrowser(lib) }
 
     var filter by rememberSaveable(stateSaver = FilterSaver) { mutableStateOf(initial) }
@@ -145,6 +146,7 @@ fun BrowseScreen(initial: BrowseFilter, onOpen: (String) -> Unit, onOpenCollecti
                     item = card.item,
                     onClick = { if (c != null) onOpenCollection(c.collection.id) else onOpen(card.item.id) },
                     badge = c?.let { "合集 · ${it.members.size} 部" },
+                    watch = remember(card, progress) { watchOf(card, progress) },
                     modifier = Modifier
                         .then(if (card == cards.first()) Modifier.focusRequester(firstCard) else Modifier)
                         .then(if (card.key == restoreKey) Modifier.focusRequester(restore) else Modifier)

@@ -7,7 +7,10 @@ import java.util.concurrent.atomic.AtomicLong
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 import arisa.quark.QuarkWebClient
 import arisa.library.LibraryCodec
 import android.content.Context
@@ -46,13 +49,23 @@ class ProgressStore(context: Context) {
     private val version = AtomicLong()
     private val syncLock = Mutex()
 
-    fun save(fid: String, positionMs: Long, durationMs: Long) {
+    /** 存盘用的后台线程, 一次只跑一个. */
+    private val writer = CoroutineScope(SupervisorJob() + Dispatchers.IO.limitedParallelism(1))
+
+    /**
+     * 记下进度. [flush] 为 true 时当场存盘 (退出播放、换集、播完: 之后 App 可能马上被系统关掉);
+     * 播放中每隔几秒记一次的传 false, 存盘放到后台线程: 存一次要把全部进度转成 JSON, 不占主线程.
+     * 内存里的值两种情况都是马上更新的.
+     */
+    fun save(fid: String, positionMs: Long, durationMs: Long, flush: Boolean = true) {
         _all.update { it + (fid to PlaybackProgress(positionMs, durationMs, System.currentTimeMillis())) }
         version.incrementAndGet()
         dirty = true
-        persist()
+        if (flush) persist() else writer.launch { persist() }
     }
 
+    /** 加锁: 主线程、后台存盘、同步都会调, 保证后存的不比先存的旧. */
+    @Synchronized
     private fun persist() {
         prefs.edit().putString("all", json.encodeToString(serializer, _all.value)).putBoolean("dirty", dirty).apply()
     }

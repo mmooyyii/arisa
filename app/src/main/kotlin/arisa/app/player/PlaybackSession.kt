@@ -151,7 +151,8 @@ class PlaybackSession(
         scope.launch {
             while (isActive) {
                 delay(10_000)
-                saveProgress()
+                // 播放中定时记的不用当场存盘; 换集、播完、退出时的那几次才当场存
+                saveProgress(flush = false)
             }
         }
         scope.launch {
@@ -362,11 +363,11 @@ class PlaybackSession(
         }
     }
 
-    fun saveProgress() {
+    fun saveProgress(flush: Boolean = true) {
         val duration = player.duration
         if (duration == C.TIME_UNSET || duration <= 0) return
         val position = if (player.playbackState == Player.STATE_ENDED) duration else player.currentPosition
-        app.progress.save(file.fid, position, duration)
+        app.progress.save(file.fid, position, duration, flush)
     }
 
     fun release() {

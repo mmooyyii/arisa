@@ -114,4 +114,9 @@ dependencies {
     implementation("androidx.media3:media3-exoplayer-hls:$media3")
     // FFmpeg 音频解码 (TrueHD / DTS / AC3 等), 设备解不了又不能直通时用. 官方没发 Maven, 用 Jellyfin 打包的, 版本跟 media3 对齐
     implementation("org.jellyfin.media3:media3-ffmpeg-decoder:$media3+1")
+
+    testImplementation(kotlin("test"))
+    testImplementation("junit:junit:4.13.2")
+    // 单元测试里的 android.net.Uri 是空壳, 用它造一个假的
+    testImplementation("org.mockito:mockito-core:5.14.2")
 }

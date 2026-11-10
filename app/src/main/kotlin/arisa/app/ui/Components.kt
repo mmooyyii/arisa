@@ -56,6 +56,10 @@ import androidx.compose.ui.unit.dp
 import androidx.tv.material3.Border
 import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
+import androidx.tv.material3.Glow
+import androidx.compose.ui.focus.onFocusChanged
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.lerp
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
 import coil3.PlatformContext
@@ -294,6 +298,26 @@ private fun focusBorder() = CardDefaults.border(
     focusedBorder = Border(BorderStroke(2.dp, Palette.Focus), shape = RoundedCornerShape(10.dp)),
 )
 
+/** 聚焦时卡片四周的光晕, 颜色跟着海报的主色调 (调亮一些, 主色调很暗时也看得见). 只有聚焦的那一张会画. */
+private fun focusGlow(color: Color) = CardDefaults.glow(
+    focusedGlow = Glow(elevationColor = lerp(color, Color.White, 0.35f).copy(alpha = 0.9f), elevation = 20.dp),
+)
+
+/**
+ * 聚焦时盖在图片上的一道高光 (从左上角斜着淡出去), 让聚焦的卡片看起来是凸起来的.
+ * 是不是聚焦只在画的时候读, 焦点移动时不用重组.
+ */
+@Composable
+private fun BoxScope.FocusSheen(focused: () -> Boolean) {
+    Box(Modifier.matchParentSize().drawWithCache {
+        val sheen = Brush.linearGradient(
+            0f to Color.White.copy(alpha = 0.22f), 0.45f to Color.White.copy(alpha = 0.04f), 0.7f to Color.Transparent,
+            start = Offset.Zero, end = Offset(size.width, size.height),
+        )
+        onDrawBehind { if (focused()) drawRect(sheen) }
+    })
+}
+
 
 /** 竖版海报卡片. [badge] 显示在左下角, 合集用来标出有几部. [watch]: 右上角的已看标记、底部的进度条. */
 @Composable
@@ -305,12 +329,15 @@ fun PosterCard(
     badge: String? = null,
     watch: WatchState = WatchState.Unwatched,
 ) {
+    var focused by remember { mutableStateOf(false) }
+    val color = parseColor(item.art.color)
     Card(
         onClick = onClick,
-        modifier = modifier.width(width).aspectRatio(2f / 3f),
+        modifier = modifier.onFocusChanged { focused = it.isFocused }.width(width).aspectRatio(2f / 3f),
         shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
-        scale = CardDefaults.scale(focusedScale = 1.08f),
+        scale = CardDefaults.scale(focusedScale = 1.1f),
         border = focusBorder(),
+        glow = remember(color) { focusGlow(color) },
     ) {
         // Card 的内容是从上到下排的, 角标要叠在海报上面, 所以包一层 Box
         Box(Modifier.fillMaxSize()) {
@@ -337,6 +364,7 @@ fun PosterCard(
                 }
             }
             WatchMarker(watch)
+            FocusSheen { focused }
         }
     }
 }
@@ -383,18 +411,21 @@ fun LandscapeCard(
     fallback: Color = Palette.Surface,
     onLongClick: (() -> Unit)? = null,
 ) {
+    var focused by remember { mutableStateOf(false) }
     Column(modifier.width(width)) {
         Card(
             onClick = onClick,
             onLongClick = onLongClick,
-            modifier = Modifier.fillMaxWidth().aspectRatio(16f / 9f),
+            modifier = Modifier.onFocusChanged { focused = it.isFocused }.fillMaxWidth().aspectRatio(16f / 9f),
             shape = CardDefaults.shape(RoundedCornerShape(10.dp)),
-            scale = CardDefaults.scale(focusedScale = 1.05f),
+            scale = CardDefaults.scale(focusedScale = 1.06f),
             border = focusBorder(),
+            glow = remember(fallback) { focusGlow(fallback) },
             ) {
             Box(Modifier.fillMaxSize()) {
                 BlurImage(imageUrl, blurHash, Modifier.fillMaxSize(), fallback = fallback)
                 if (progress != null) ProgressBar(progress)
+                FocusSheen { focused }
             }
         }
         Spacer(Modifier.height(8.dp))

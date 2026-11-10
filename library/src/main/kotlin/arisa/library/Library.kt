@@ -19,7 +19,7 @@ data class Library(
     val items: List<MediaItem> = emptyList(),
     /** 没识别出来的视频, TV 上放在"未识别"里, 仍然能播. */
     val unmatched: List<MediaFile> = emptyList(),
-    /** 合集: 同一个顶层目录里的多部作品, TV 首页合成一张卡片. */
+    /** 合集: TMDB 上同一个系列的电影, 或者同一个顶层目录里的多部作品, TV 首页合成一张卡片. */
     val collections: List<MediaCollection> = emptyList(),
     /**
      * 搜索用的拼音, 刮削时生成: 名字 (片名、原名、合集名、演员、导演、类型) → 逐字读音.
@@ -33,10 +33,10 @@ data class Library(
     }
 }
 
-/** 一个顶层目录里识别出的多部作品 (正篇、新编集版、剧场版…). */
+/** 一个合集: TMDB 上的电影系列, 或者一个顶层目录里识别出的多部作品 (正篇、新编集版、剧场版…). */
 @Serializable
 data class MediaCollection(
-    /** "dir:<顶层目录 fid>". */
+    /** "tmdb:<TMDB 系列 id>" 或 "dir:<顶层目录 fid>". App 只把它当成一个不重复的字符串. */
     val id: String,
     val name: String,
     /** 封面用哪部作品的图, [MediaItem.id]. */

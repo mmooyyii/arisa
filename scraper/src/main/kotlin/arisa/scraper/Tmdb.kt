@@ -191,11 +191,16 @@ class Tmdb(
         @SerialName("original_language") val originalLanguage: String? = null,
         @SerialName("origin_country") val originCountry: List<String> = emptyList(),
         @SerialName("production_countries") val productionCountries: List<Country> = emptyList(),
+        /** 电影所属的系列 (如「沙丘（系列）」), 只有电影有. */
+        @SerialName("belongs_to_collection") val belongsToCollection: CollectionRef? = null,
     ) {
         val displayTitle get() = title ?: name ?: ""
         val displayOriginal get() = originalTitle ?: originalName
         val year get() = (releaseDate ?: firstAirDate)?.take(4)?.toIntOrNull()
     }
+
+    @Serializable
+    data class CollectionRef(val id: Int, val name: String = "")
 
     @Serializable
     data class Genre(val id: Int, val name: String)

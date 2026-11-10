@@ -14,6 +14,12 @@ internal class FakeTmdb : TmdbApi {
     val movies = mapOf(
         693134 to Tmdb.Details(id = 693134, title = "沙丘2", originalTitle = "Dune: Part Two", releaseDate = "2024-02-27", overview = "保罗…", posterPath = "/p1.jpg", runtime = 167),
         438631 to Tmdb.Details(id = 438631, title = "沙丘", originalTitle = "Dune", releaseDate = "2021-09-15", overview = "…", posterPath = "/p0.jpg"),
+        // 同一个系列的两部
+        535167 to Tmdb.Details(id = 535167, title = "流浪地球", releaseDate = "2019-02-05", overview = "…", belongsToCollection = Tmdb.CollectionRef(1, "流浪地球（系列）")),
+        842675 to Tmdb.Details(id = 842675, title = "流浪地球2", releaseDate = "2023-01-22", overview = "…", belongsToCollection = Tmdb.CollectionRef(1, "流浪地球（系列）")),
+        // 属于某个系列, 但片库里只有这一部
+        9001 to Tmdb.Details(id = 9001, title = "独行月球", releaseDate = "2022-07-29", overview = "…", belongsToCollection = Tmdb.CollectionRef(2, "独行月球（系列）")),
+        9002 to Tmdb.Details(id = 9002, title = "疯狂的石头", releaseDate = "2006-06-30", overview = "…"),
     )
     val shows = mapOf(
         209867 to Tmdb.Details(id = 209867, name = "葬送的芙莉莲", originalName = "葬送のフリーレン", firstAirDate = "2023-09-29", overview = "…"),
@@ -219,6 +225,33 @@ class ScraperTest {
         assertEquals(listOf("tv:2002", "tv:46298"), byName.getValue("全职猎人").items)
         assertEquals("movie:438631", byName.getValue("沙丘系列").cover)
         assertEquals(listOf("movie:438631", "movie:693134"), byName.getValue("沙丘系列").items)
+    }
+
+    @Test
+    fun collectionsFromTmdbSeries() {
+        val e = env(LibraryConfig("/没看", LibraryType.AUTO))
+        val root = e.root
+        // 同一个系列的两部电影放在不同的顶层目录里: 按 TMDB 的系列归到一起
+        touch(root, "没看/流浪地球 (2019)/a.mkv")
+        touch(root, "没看/流浪地球2 (2023)/b.mkv")
+        // 系列里只有一部在片库里: 不成合集, 还可以按目录归组
+        touch(root, "没看/杂/独行月球/c.mkv")
+        touch(root, "没看/杂/疯狂的石头/d.mkv")
+        e.decide("没看/流浪地球 (2019)", "movie:535167")
+        e.decide("没看/流浪地球2 (2023)", "movie:842675")
+        e.decide("没看/杂/独行月球", "movie:9001")
+        e.decide("没看/杂/疯狂的石头", "movie:9002")
+
+        val (library, _) = e.scraper.build(e.scan(), e.store.load(), write = false)
+        val byId = library.collections.associateBy { it.id }
+        assertEquals(setOf("流浪地球（系列）", "杂"), library.collections.map { it.name }.toSet())
+        val series = byId.getValue("tmdb:1")
+        assertEquals("流浪地球（系列）", series.name)
+        assertEquals("movie:535167", series.cover)
+        assertEquals(listOf("movie:535167", "movie:842675"), series.items)
+        assertEquals(listOf("movie:9002", "movie:9001"), library.collections.first { it.name == "杂" }.items)
+        // 系列名也能用拼音搜
+        assertTrue("流浪地球（系列）" in library.pinyin)
     }
 
     @Test

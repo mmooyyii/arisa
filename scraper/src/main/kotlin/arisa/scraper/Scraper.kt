@@ -344,6 +344,8 @@ class Scraper(
 
         val items = mutableListOf<MediaItem>()
         val filesOf = HashMap<String, List<ScannedFile>>()
+        // 电影在 TMDB 上属于哪个系列, 合集按它归组
+        val seriesOf = HashMap<String, Tmdb.CollectionRef>()
         for ((target, list) in byTarget) {
             val (kind, id) = list.first().second.tmdb()!!
             val eff = config.effective(list.first().first.library)
@@ -352,6 +354,7 @@ class Scraper(
                 val item = if (kind == "movie") buildMovie(tmdb, id, list.map { it.first }, eff, source)
                 else buildTv(tmdb, id, list, eff, source)
                 items += withBangumi(tmdb, item, list.firstNotNullOfOrNull { it.second.bangumi }, eff)
+                if (kind == "movie") details(tmdb, kind, id, eff).belongsToCollection?.let { seriesOf[item.id] = it }
                 filesOf[item.id] = list.map { it.first }
             } catch (e: TmdbAuthException) {
                 throw e
@@ -363,7 +366,7 @@ class Scraper(
         items.sortByDescending { it.addedAt }
 
         val previous = runCatching { loadLatestIndex() }.getOrNull()
-        val collections = collections(items, filesOf)
+        val collections = collections(items, filesOf, seriesOf)
         val library = Pinyin.annotate(Library(generatedAt = System.currentTimeMillis(), items = items, unmatched = unmatched, collections = collections))
         log("${items.size} 部作品, ${collections.size} 个合集, ${unmatched.size} 个视频待识别")
 
@@ -383,10 +386,28 @@ class Scraper(
     }
 
     /**
-     * 同一个顶层目录里有多部作品的, 合成一个合集 (和改名计划里的「合集」是同一个判断).
-     * 名字和封面用合集里集数最多的剧; 全是电影时名字用目录名, 封面用最早的那部.
+     * 合集, 两种来源, 一部作品只进一个:
+     * 1. TMDB 上属于同一个系列的电影 (片库里有两部以上), 不管放在网盘的哪个目录. 名字用 TMDB 的系列名, 封面用最早的那部.
+     * 2. 剩下的作品里, 同一个顶层目录里有多部的 (和改名计划里的「合集」是同一个判断). TMDB 的系列只管电影,
+     *    一部动画的正篇、新编集版、剧场版放在一个目录里的情况靠这一条.
+     *    名字和封面用合集里集数最多的剧; 全是电影时名字用目录名, 封面用最早的那部.
      */
-    private fun collections(items: List<MediaItem>, filesOf: Map<String, List<ScannedFile>>): List<MediaCollection> {
+    private fun collections(
+        items: List<MediaItem>,
+        filesOf: Map<String, List<ScannedFile>>,
+        seriesOf: Map<String, Tmdb.CollectionRef>,
+    ): List<MediaCollection> {
+        val byYear = compareBy<MediaItem, Int?>(nullsLast()) { it.year }.thenBy { it.title }
+        val series = items.filter { it.id in seriesOf }.groupBy { seriesOf.getValue(it.id).id }.values.filter { it.size >= 2 }.map { members ->
+            val ref = seriesOf.getValue(members[0].id)
+            val sorted = members.sortedWith(byYear)
+            MediaCollection(id = "tmdb:${ref.id}", name = ref.name.ifBlank { sorted.first().title }, cover = sorted.first().id, items = sorted.map { it.id })
+        }
+        val inSeries = series.flatMap { it.items }.toSet()
+        return (series + directoryCollections(items.filter { it.id !in inSeries }, filesOf)).sortedBy { it.id }
+    }
+
+    private fun directoryCollections(items: List<MediaItem>, filesOf: Map<String, List<ScannedFile>>): List<MediaCollection> {
         // 作品的文件分散在几个顶层目录时, 算在文件最多的那个里
         val topOf = items.mapNotNull { item ->
             val top = filesOf[item.id].orEmpty().mapNotNull { it.dirs.firstOrNull() }
@@ -403,7 +424,7 @@ class Scraper(
                 cover = (mainTv ?: sorted.first()).id,
                 items = sorted.map { it.id },
             )
-        }.sortedBy { it.id }
+        }
     }
 
     /**

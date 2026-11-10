@@ -27,7 +27,9 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
@@ -109,19 +111,40 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
     var buffered by remember { mutableLongStateOf(0L) }
     var playing by remember { mutableStateOf(false) }
     var buffering by remember { mutableStateOf(true) }
-    LaunchedEffect(Unit) {
+    var osd by remember { mutableStateOf(true) }
+    var panel by remember { mutableStateOf(false) }
+    // 要不要提示下一集. 只在进入、离开最后 30 秒时变一次, 不跟着播放位置变
+    val showNext by remember {
+        derivedStateOf {
+            session.nextEpisode != null && duration > 0 && duration - position in 1..NEXT_PROMPT_MS && !panel && session.error == null
+        }
+    }
+    // 进度条或下一集提示 (有倒计时) 显示着的时候一秒看 4 次播放位置, 都没有时一秒一次就够.
+    // 进度条一出来就重新开始, 马上拿到最新的位置.
+    // position 这几个值只在进度条、下一集提示里面读, 这个函数自己不读: 不然播放时整个页面一秒要重组 4 次
+    LaunchedEffect(osd) {
         while (true) {
             position = player.currentPosition
             duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
             buffered = player.bufferedPosition
             playing = player.isPlaying
             buffering = player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_IDLE
-            delay(250)
+            delay(if (osd || showNext) 250 else 1000)
         }
     }
 
-    var osd by remember { mutableStateOf(true) }
-    var panel by remember { mutableStateOf(false) }
+    // 暂停、缓冲这些状态一变就更新, 不等上面的下一次轮询 (进度条藏着时要等一秒)
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onEvents(p: Player, events: Player.Events) {
+                playing = p.isPlaying
+                buffering = p.playbackState == Player.STATE_BUFFERING || p.playbackState == Player.STATE_IDLE
+            }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+
     var interaction by remember { mutableLongStateOf(0L) }
     fun touch() {
         osd = true
@@ -157,7 +180,6 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
     }
 
     val next = session.nextEpisode
-    val showNext = next != null && duration > 0 && duration - position in 1..NEXT_PROMPT_MS && !panel && session.error == null
 
     val rootFocus = remember { FocusRequester() }
     LaunchedEffect(panel) { if (!panel) runCatching { rootFocus.requestFocus() } }

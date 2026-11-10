@@ -22,10 +22,18 @@ class ParallelRangeDataSourceTest {
     private val requests = Collections.synchronizedList(mutableListOf<Pair<Long, Long>>())
 
     /** 假的上游: 按 Range 返回 [data] 里的一段; 可以让某些请求先失败几次. */
-    private inner class Upstream(private val failFirst: Int = 0) : DataSource.Factory {
+    private inner class Upstream(
+        private val failFirst: Int = 0,
+        /** 每个连接读到这么多字节后: 断一次 ([breakOnce]) 或者一直卡住不再给数据. */
+        private val stopAfter: Int = Int.MAX_VALUE,
+        private val breakOnce: Boolean = false,
+    ) : DataSource.Factory {
+        private val broken = java.util.concurrent.atomic.AtomicBoolean()
+
         private val failures = java.util.concurrent.atomic.AtomicInteger(failFirst)
 
         override fun createDataSource(): DataSource = object : DataSource {
+            private var start = 0
             private var pos = 0
             private var end = 0
 
@@ -36,13 +44,19 @@ class ParallelRangeDataSourceTest {
                 if (failures.getAndDecrement() > 0) throw IOException("假装断网")
                 // 夸克对超出文件末尾的 Range 会返回整个文件, 这里直接算错
                 check(dataSpec.length != C.LENGTH_UNSET.toLong() && dataSpec.position + dataSpec.length <= data.size) { "请求超出文件末尾: $dataSpec" }
-                pos = dataSpec.position.toInt()
+                start = dataSpec.position.toInt()
+                pos = start
                 end = pos + dataSpec.length.toInt()
                 return dataSpec.length
             }
 
             override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
                 if (pos >= end) return C.RESULT_END_OF_INPUT
+                if (pos - start >= stopAfter) {
+                    if (!breakOnce) Thread.sleep(Long.MAX_VALUE)
+                    // 只断从文件开头读的那个连接 (第一段), 后面的段有自己的重试
+                    if (start == 0 && broken.compareAndSet(false, true)) throw IOException("假装连接断了")
+                }
                 // 每次只给一点, 像网络那样零零碎碎地到
                 val n = minOf(length, end - pos, 37)
                 System.arraycopy(data, pos, buffer, offset, n)
@@ -138,6 +152,23 @@ class ParallelRangeDataSourceTest {
             assertContentEquals(expected, s.readBytes(limit), "从 $position 读 $limit")
             s.close()
         }
+    }
+
+    /** 第一段不等下完: 连接只给了一部分就卡住, 已经到的那些也要能读出来. */
+    @Test fun firstPartIsHandedOverAsItArrives() {
+        val s = source(upstream = Upstream(stopAfter = 60))
+        s.open(spec())
+        assertContentEquals(data.copyOfRange(0, 60), s.readBytes(limit = 60))
+        s.close()
+    }
+
+    @Test fun firstPartResumesAfterBrokenConnection() {
+        val s = source(upstream = Upstream(stopAfter = 60, breakOnce = true))
+        s.open(spec())
+        assertContentEquals(data, s.readBytes())
+        s.close()
+        // 断在第 74 个字节 (每次给 37 个), 重连时从那里接着要剩下的 26 个
+        assertTrue(74L to 26L in requests)
     }
 
     @Test fun retriesFailedParts() {

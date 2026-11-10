@@ -26,8 +26,10 @@ import java.util.concurrent.Future
  * 而是 200 加整个文件, 播放器就得从头读过去. MP4 的索引在文件末尾时 (先读末尾再回来播) 会卡住不动,
  * 所以每段都要裁到文件末尾为止.
  *
- * 开头的几段从 [firstPartSize] 起每段翻倍, 到 [partSize] 为止: 第一段要下完才有数据给播放器,
- * 而起播、跳转时播放器先要的只是文件头或一小段数据, 一上来就等一整段 10MB 会多等一两秒.
+ * 第一段不攒, 收到多少就交给播放器多少 (和普通的单连接读取一样): 起播、跳转时播放器先要的只是文件头
+ * 或者够播一秒的数据, 码率低的片子几百 KB 就够, 不用等一整段下完.
+ * 后面的段是提前下的, 播放器还没读到那里, 所以先放在内存里, 整段下完再按顺序交出去.
+ * 这些段从 [firstPartSize] 的两倍起每段翻倍, 到 [partSize] 为止: 跳转后紧接着要的几段小一点, 到得快.
  *
  * 整段大小的缓冲区用完放回 [pool] 接着用: 高码率的片子大约每秒读完一段, 每段新开 10MB 的数组的话,
  * 堆本来就被播放缓冲占了一大块, 垃圾回收会很频繁.
@@ -60,10 +62,15 @@ class ParallelRangeDataSource(
     private var total = 0L
     /** 已经排了几段, 用来算下一段多大. */
     private var parts = 0
+    /** 第一段的连接, 边收边交给播放器; 读完就是 null. */
+    private var head: DataSource? = null
+    /** 第一段读到哪了 (相对 spec.position) 和还剩多少. */
+    private var headPos = 0L
+    private var headLeft = 0L
     private var current: Part? = null
     private var currentPos = 0
 
-    /** 第 [index] 段的大小: 1MB, 2MB, 4MB, 8MB, 之后都是 [partSize]. */
+    /** 第 [index] 段的大小: 1MB (边收边给), 2MB, 4MB, 8MB, 之后都是 [partSize]. */
     private fun sizeOf(index: Int): Int = if (index >= 30) partSize else minOf(partSize.toLong(), firstPartSize.toLong() shl index).toInt()
 
     private fun acquire(size: Int): ByteArray = if (size == partSize) pool.pollFirst() ?: ByteArray(partSize) else ByteArray(size)
@@ -87,15 +94,17 @@ class ParallelRangeDataSource(
             else -> null
         }
         if (known != null && known <= 0) return 0
-        // 第一段同步下; 不知道文件大小时从 Content-Range 拿
-        val firstSize = if (known == null) sizeOf(0) else minOf(sizeOf(0).toLong(), known).toInt()
-        val first = fetch(dataSpec, 0, acquire(firstSize), firstSize, headers = true)
+        // 第一段只把连接打开, 数据在 read 里边收边给; 不知道文件大小时从 Content-Range 拿
+        val firstSize = if (known == null) sizeOf(0).toLong() else minOf(sizeOf(0).toLong(), known)
+        headPos = 0
+        headLeft = firstSize
+        head = openHead(dataSpec)
         total = known ?: responseHeaders.entries.firstOrNull { it.key.equals("Content-Range", true) }?.value?.firstOrNull()
             ?.substringAfter('/')?.toLongOrNull()?.minus(dataSpec.position)
-            ?: first.length.toLong()
-        current = first
+            ?: firstSize
+        current = null
         currentPos = 0
-        nextOffset = first.length.toLong()
+        nextOffset = firstSize
         parts = 1
         fill()
         return total
@@ -109,14 +118,65 @@ class ParallelRangeDataSource(
             val offset = nextOffset
             val len = minOf(sizeOf(parts).toLong(), total - offset).toInt()
             val buf = acquire(len)
-            pending += ex.submit<Part> { fetch(s, offset, buf, len, headers = false) }
+            pending += ex.submit<Part> { fetch(s, offset, buf, len) }
             nextOffset += len
             parts++
         }
     }
 
+    /** 打开第一段剩下的部分 (从 [headPos] 起 [headLeft] 个字节), 失败重试 3 次. */
+    private fun openHead(s: DataSpec): DataSource {
+        var last: IOException? = null
+        repeat(PART_RETRIES) { attempt ->
+            val src = upstream.createDataSource().also { d -> listeners.forEach(d::addTransferListener) }
+            active += src
+            try {
+                src.open(s.subrange(headPos, headLeft))
+                responseHeaders = src.responseHeaders
+                uri = src.uri
+                return src
+            } catch (e: IOException) {
+                active -= src
+                runCatching { src.close() }
+                last = e
+                if (attempt < PART_RETRIES - 1) Thread.sleep(500L * (attempt + 1))
+            }
+        }
+        throw last!!
+    }
+
+    private fun closeHead() {
+        head?.let { active -= it; runCatching { it.close() } }
+        head = null
+    }
+
+    /** 从第一段的连接读; 读完了返回 null. 中途断了就从断的地方重新连. */
+    private fun readHead(buffer: ByteArray, offset: Int, length: Int): Int? {
+        var failures = 0
+        while (headLeft > 0) {
+            val src = head ?: openHead(spec ?: return null).also { head = it }
+            val n = try {
+                src.read(buffer, offset, minOf(length.toLong(), headLeft).toInt())
+            } catch (e: IOException) {
+                if (e is InterruptedIOException || ++failures >= PART_RETRIES) throw e
+                closeHead()
+                continue
+            }
+            if (n == C.RESULT_END_OF_INPUT) break // 文件比预想的短
+            if (n > 0) {
+                headPos += n
+                headLeft -= n
+                if (headLeft == 0L) closeHead()
+                return n
+            }
+        }
+        headLeft = 0
+        closeHead()
+        return null
+    }
+
     /** 下载一段到 [buf] 里, 失败重试 3 次. */
-    private fun fetch(s: DataSpec, offset: Long, buf: ByteArray, length: Int, headers: Boolean): Part {
+    private fun fetch(s: DataSpec, offset: Long, buf: ByteArray, length: Int): Part {
         var last: IOException? = null
         repeat(PART_RETRIES) { attempt ->
             if (Thread.currentThread().isInterrupted) throw InterruptedIOException()
@@ -124,10 +184,6 @@ class ParallelRangeDataSource(
             active += src
             try {
                 src.open(s.subrange(offset, length.toLong()))
-                if (headers) {
-                    responseHeaders = src.responseHeaders
-                    uri = src.uri
-                }
                 var read = 0
                 while (read < length) {
                     val n = src.read(buf, read, length - read)
@@ -148,6 +204,7 @@ class ParallelRangeDataSource(
 
     override fun read(buffer: ByteArray, offset: Int, length: Int): Int {
         if (length == 0) return 0
+        if (headLeft > 0) readHead(buffer, offset, length)?.let { return it }
         var part = current
         while (part == null || currentPos >= part.length) {
             val next = pending.pollFirst() ?: return C.RESULT_END_OF_INPUT
@@ -182,6 +239,8 @@ class ParallelRangeDataSource(
         }
         pending.clear()
         synchronized(active) { active.forEach { runCatching { it.close() } } }
+        head = null
+        headLeft = 0
         executor?.shutdownNow()
         executor = null
         recycle(current)

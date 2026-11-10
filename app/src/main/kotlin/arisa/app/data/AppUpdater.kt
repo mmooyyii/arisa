@@ -23,6 +23,10 @@ import java.security.MessageDigest
 /**
  * App 更新: 刮削器把新版 APK 和 latest.json 转存到网盘 `/.arisa/app/` (电视上连 GitHub 不稳),
  * 这里读清单、下载、校验, 再交给系统安装器. 安装要用户在电视上点确认.
+ *
+ * 安装包几十 MB, 边下边写文件、边算校验值, 不整个读进内存 (电视给 App 的内存不多).
+ * 这里的 sha256 只防下载坏了: 清单和安装包在同一个网盘目录里, 能换掉一个就能换掉另一个.
+ * 防别人换包靠的是安卓: 签名和已装的不一样就装不上.
  */
 class AppUpdater(
     private val context: Context,
@@ -62,7 +66,7 @@ class AppUpdater(
             when {
                 manifest?.app == null || files.none { it.name == manifest.app!!.name } -> State.NotFound
                 manifest.versionCode <= BuildConfig.VERSION_CODE -> State.UpToDate
-                else -> File(dir, manifest.app!!.name).takeIf { it.exists() && verify(it.readBytes(), manifest) }
+                else -> File(dir, manifest.app!!.name).takeIf { it.exists() && verify(it, manifest) }
                     ?.let { State.Ready(manifest, it) } ?: State.Available(manifest)
             }
         } catch (e: Exception) {
@@ -80,22 +84,32 @@ class AppUpdater(
             dir.listFiles()?.forEach { it.delete() }
             val link = client.downloadLink(fid)
             val req = Request.Builder().url(link.url).apply { link.headers.forEach { (k, v) -> header(k, v) } }.build()
-            val out = java.io.ByteArrayOutputStream(asset.size.toInt())
+            // 先写到临时文件, 校验过了再改成正式名字: 正式名字的文件一定是完整的
+            val tmp = File(dir, asset.name + ".part")
+            val digest = MessageDigest.getInstance("SHA-256")
+            var size = 0L
             http.newCall(req).execute().use { resp ->
                 check(resp.isSuccessful) { "下载失败 ${resp.code}" }
                 resp.body!!.byteStream().use { input ->
-                    val buf = ByteArray(64 * 1024)
-                    while (true) {
-                        val n = input.read(buf)
-                        if (n < 0) break
-                        out.write(buf, 0, n)
-                        _state.value = State.Downloading(manifest, out.size().toFloat() / asset.size)
+                    tmp.outputStream().use { out ->
+                        val buf = ByteArray(64 * 1024)
+                        while (true) {
+                            val n = input.read(buf)
+                            if (n < 0) break
+                            out.write(buf, 0, n)
+                            digest.update(buf, 0, n)
+                            size += n
+                            _state.value = State.Downloading(manifest, size.toFloat() / asset.size)
+                        }
                     }
                 }
             }
-            val bytes = out.toByteArray()
-            check(verify(bytes, manifest)) { "安装包校验失败, 重新下载试试" }
-            val apk = File(dir, asset.name).apply { writeBytes(bytes) }
+            if (size != asset.size || hex(digest) != asset.sha256) {
+                tmp.delete()
+                error("安装包校验失败, 重新下载试试")
+            }
+            val apk = File(dir, asset.name)
+            check(tmp.renameTo(apk)) { "保存安装包失败" }
             State.Ready(manifest, apk)
         } catch (e: Exception) {
             State.Error(e.message ?: e.toString())
@@ -143,9 +157,21 @@ class AppUpdater(
         }
     }
 
-    private fun verify(bytes: ByteArray, manifest: ReleaseManifest): Boolean {
+    /** 已经下好的安装包对不对得上清单. */
+    private fun verify(file: File, manifest: ReleaseManifest): Boolean {
         val asset = manifest.app ?: return false
-        val sha = MessageDigest.getInstance("SHA-256").digest(bytes).joinToString("") { "%02x".format(it) }
-        return bytes.size.toLong() == asset.size && sha == asset.sha256
+        if (file.length() != asset.size) return false
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buf = ByteArray(64 * 1024)
+            while (true) {
+                val n = input.read(buf)
+                if (n < 0) break
+                digest.update(buf, 0, n)
+            }
+        }
+        return hex(digest) == asset.sha256
     }
+
+    private fun hex(digest: MessageDigest) = digest.digest().joinToString("") { "%02x".format(it) }
 }

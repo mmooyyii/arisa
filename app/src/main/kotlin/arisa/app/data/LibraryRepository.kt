@@ -10,7 +10,9 @@ import kotlinx.coroutines.withContext
 import okhttp3.OkHttpClient
 import okhttp3.Request
 import arisa.library.Library
+import arisa.library.LibraryBrowser
 import arisa.library.LibraryCodec
+import arisa.library.LibrarySearch
 import arisa.library.MediaCollection
 import arisa.library.MediaFile
 import arisa.library.MediaItem
@@ -65,6 +67,12 @@ class LibraryRepository(
         if (cacheFile.exists()) {
             _library.value = runCatching { LibraryCodec.decode(cacheFile.readBytes()).takeIf { it.schema <= Library.SCHEMA }?.playableFirst() }.getOrNull()
         }
+        warm()
+    }
+
+    /** 在后台线程把搜索、筛选要用的东西先建好, 页面打开时直接用, 不占主线程. */
+    private fun warm() {
+        index()?.run { browser; search }
     }
 
     suspend fun refresh() = withContext(Dispatchers.IO) {
@@ -87,6 +95,7 @@ class LibraryRepository(
                         cacheFile.writeBytes(bytes)
                         cacheNameFile.writeText(latest)
                         _library.value = lib.playableFirst()
+                        warm()
                     }
                     Status.Idle
                 }
@@ -124,11 +133,22 @@ class LibraryRepository(
     /** 没识别出来的视频, 不属于任何作品, 按 fid 找. */
     fun unmatchedFile(fid: String): MediaFile? = index()?.unmatched?.get(fid)
 
+    /** 片库页、首页分类行用的筛选器. 和 [search] 一样按片库缓存, 片库换了才重建. */
+    fun browser(): LibraryBrowser? = index()?.browser
+
+    /**
+     * 搜索索引. 建一次要把每部作品的片名、别名、演员都过一遍, 页面每次打开 (包括从详情页返回) 都重建的话会卡一下,
+     * 所以放在这里, 片库加载完就在后台建好.
+     */
+    fun search(): LibrarySearch? = index()?.search
+
     /** 按 id 查的索引, 片库换了才重建. 合集页、详情页每次查都扫一遍列表, 片子多了慢. */
     private class Index(val library: Library) {
         val items = library.items.associateBy { it.id }
         val collections = library.collections.associateBy { it.id }
         val unmatched = library.unmatched.associateBy { it.fid }
+        val browser by lazy { LibraryBrowser(library) }
+        val search by lazy { LibrarySearch(library) }
     }
 
     @Volatile private var index: Index? = null

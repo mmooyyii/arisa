@@ -58,7 +58,7 @@ fun BrowseScreen(initial: BrowseFilter, onOpen: (String) -> Unit, onOpenCollecti
     val app = ArisaApp.instance
     val library by app.library.library.collectAsStateWithLifecycle()
     val lib = library ?: return
-    val browser = remember(lib) { LibraryBrowser(lib) }
+    val browser = remember(lib) { app.library.browser() ?: LibraryBrowser(lib) }
 
     var filter by rememberSaveable(stateSaver = FilterSaver) { mutableStateOf(initial) }
     var open by rememberSaveable { mutableStateOf<Dimension?>(null) }

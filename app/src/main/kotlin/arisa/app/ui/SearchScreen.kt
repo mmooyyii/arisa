@@ -54,7 +54,7 @@ fun SearchScreen(
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { runCatching { focus.requestFocus() } }
 
-    val index = remember(library) { library?.let(::LibrarySearch) }
+    val index = remember(library) { app.library.search() }
     val items = library?.items.orEmpty()
     val results = remember(query, items, index) {
         if (query.isBlank()) items.sortedByDescending { it.addedAt }.map { Hit.Item(it, 0) }

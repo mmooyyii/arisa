@@ -56,6 +56,7 @@ import androidx.tv.material3.Card
 import androidx.tv.material3.CardDefaults
 import arisa.library.BrowseFilter
 import arisa.library.BrowseSort
+import arisa.library.Library
 import arisa.library.LibraryBrowser
 import arisa.library.LibraryBrowser.Card
 import arisa.library.MediaItem
@@ -89,7 +90,7 @@ fun HomeScreen(
     }
 
     val continueWatching = remember(lib, progress) { app.progress.continueWatching(lib, progress) }
-    val shelves = remember(lib) { buildShelves(LibraryBrowser(lib)) }
+    val shelves = remember(lib) { shelvesOf(lib, app.library.browser() ?: LibraryBrowser(lib)) }
 
     // 记住最后聚焦的卡片 ("行:作品"), 从详情页返回时焦点回到那里, 不回第一个
     var lastFocus by rememberSaveable { mutableStateOf<String?>(null) }
@@ -336,6 +337,15 @@ private fun MoreCard(total: Int, onClick: () -> Unit, modifier: Modifier = Modif
         }
     }
 }
+
+/**
+ * 首页的分类行按片库缓存: 从别的页面返回时首页是重新组合的, 记在页面里的东西都没了, 不缓存就每次返回都重算一遍.
+ * 只在主线程用.
+ */
+private var shelfCache: Pair<Library, List<Shelf>>? = null
+
+private fun shelvesOf(lib: Library, browser: LibraryBrowser): List<Shelf> =
+    shelfCache?.takeIf { it.first === lib }?.second ?: buildShelves(browser).also { shelfCache = lib to it }
 
 /**
  * 首页的分类行. 规则和片库页一样 (同一合集两部以上合成一张), 「全部」点进去看到的就是这一行的完整内容.

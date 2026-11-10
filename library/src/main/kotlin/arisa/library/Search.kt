@@ -52,9 +52,10 @@ class LibrarySearch(library: Library) {
         val q = normalize(query)
         if (q.isEmpty()) return emptyList()
         val year = q.toIntOrNull()?.takeIf { q.length == 4 }
+        val latin = isLatin(q)
         return entries.mapNotNull { e ->
             val score = maxOf(
-                e.fields.maxOfOrNull { f -> f.text.match(q).let { if (it > 0) f.weight + it else 0 } } ?: 0,
+                e.fields.maxOfOrNull { f -> f.text.match(q, latin).let { if (it > 0) f.weight + it else 0 } } ?: 0,
                 if (year != null && e.year == year) YEAR else 0,
             )
             if (score > 0) e to score else null
@@ -68,28 +69,32 @@ class LibrarySearch(library: Library) {
         private val readings: List<List<String>>? =
             pinyin?.split(' ')?.map { it.split('|') }?.takeIf { it.size == plain.length }
 
-        /** 0 是没命中; 越大越相关: 完全一样 > 开头 > 包含 > 拼音开头 > 拼音包含. */
-        fun match(q: String): Int = when {
+        /**
+         * 0 是没命中; 越大越相关: 完全一样 > 开头 > 包含 > 拼音开头 > 拼音包含.
+         * [latin]: 查询是不是只有字母数字 (才可能是拼音), 一次搜索要比几万段文字, 由调用方算一次传进来.
+         */
+        fun match(q: String, latin: Boolean = isLatin(q)): Int = when {
             plain == q -> 30
             plain.startsWith(q) -> 25
             plain.contains(q) -> 20
-            readings != null && q.all { it in 'a'..'z' || it in '0'..'9' } -> pinyinMatch(q)
+            readings != null && latin -> pinyinMatch(q)
             else -> 0
         }
 
         private fun pinyinMatch(q: String): Int {
             val r = readings!!
-            // memo[i][p]: 从第 i 个字、查询第 p 个字母开始能不能匹配完; 0 未算 1 能 2 不能
-            val memo = Array(r.size + 1) { ByteArray(q.length + 1) }
+            // memo[i * w + p]: 从第 i 个字、查询第 p 个字母开始能不能匹配完; 0 未算 1 能 2 不能
+            val w = q.length + 1
+            val memo = ByteArray((r.size + 1) * w)
             fun from(i: Int, p: Int): Boolean {
                 if (p == q.length) return true
                 if (i == r.size) return false
-                if (memo[i][p] != 0.toByte()) return memo[i][p] == 1.toByte()
+                if (memo[i * w + p] != 0.toByte()) return memo[i * w + p] == 1.toByte()
                 // 每个字吃掉它某个读法的前几个字母: 首字母 (l)、声母 (zh)、全拼 (liu) 都行
                 val ok = r[i].any { s ->
                     (1..minOf(s.length, q.length - p)).any { k -> q.regionMatches(p, s, 0, k) && from(i + 1, p + k) }
                 }
-                memo[i][p] = if (ok) 1 else 2
+                memo[i * w + p] = if (ok) 1 else 2
                 return ok
             }
             return when {
@@ -108,6 +113,8 @@ class LibrarySearch(library: Library) {
         private const val GENRE = 50
         private const val YEAR = 70
         private const val FILE = 40
+
+        private fun isLatin(q: String) = q.all { it in 'a'..'z' || it in '0'..'9' }
 
         fun isHan(c: Char) = Character.UnicodeScript.of(c.code) == Character.UnicodeScript.HAN
 

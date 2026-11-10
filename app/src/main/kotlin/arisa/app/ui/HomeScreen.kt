@@ -30,11 +30,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.focus.onFocusChanged
@@ -45,7 +42,6 @@ import androidx.tv.material3.Button
 import androidx.tv.material3.ButtonDefaults
 import androidx.tv.material3.MaterialTheme
 import androidx.tv.material3.Text
-import kotlinx.coroutines.delay
 import arisa.app.ArisaApp
 import arisa.app.data.AppUpdater
 import arisa.app.data.LibraryRepository
@@ -94,24 +90,14 @@ fun HomeScreen(
 
     // 记住最后聚焦的卡片 ("行:作品"), 从详情页返回时焦点回到那里, 不回第一个
     var lastFocus by rememberSaveable { mutableStateOf<String?>(null) }
-    // 文字跟着焦点立刻变; 背景大图焦点一到就开始加载, 停留 300ms 后才切:
-    // 遥控器连按时背景不动, 换背景对电视 GPU 是重活
+    // 文字跟着焦点立刻变; 背景大图焦点一到就开始加载, 停留 300ms 后才切 (见 Backdrop)
     var focused by remember {
         mutableStateOf(
             Snapshot.withoutReadObservation { lastFocus }?.substringAfter(':')?.let(app.library::item)
                 ?: continueWatching.firstOrNull()?.item ?: lib.items.firstOrNull()
         )
     }
-    var hero by remember { mutableStateOf(focused) }
-    val context = LocalContext.current
-    // 在 snapshotFlow 里读焦点, 不在页面里读: 页面里读的话每按一下方向键整个首页都要重组
-    LaunchedEffect(Unit) {
-        snapshotFlow { focused }.collectLatest { f ->
-            f?.let { prefetchBackdrop(context, it) }
-            delay(300)
-            hero = f
-        }
-    }
+    // 焦点只在 HomeBackdrop、HeroInfo 里面读, 不在页面里读: 页面里读的话每按一下方向键整个首页都要重组
 
     val firstFocus = remember { FocusRequester() }
     val restoreFocus = remember { FocusRequester() }
@@ -128,7 +114,7 @@ fun HomeScreen(
         .onFocusChanged { if (it.hasFocus) lastFocus = key }
 
     Box(Modifier.fillMaxSize()) {
-        HomeBackdrop { hero }
+        HomeBackdrop { focused }
 
         Column(Modifier.fillMaxSize()) {
             TopBar(onBrowse = { onBrowse(BrowseFilter()) }, onSearch, onSettings, status)
@@ -275,7 +261,7 @@ private fun TopBar(onBrowse: () -> Unit, onSearch: () -> Unit, onSettings: () ->
 
 /** 背景和焦点信息按 lambda 传, 只有它们自己跟着焦点重组. */
 @Composable
-private fun HomeBackdrop(item: () -> MediaItem?) = Backdrop(item())
+private fun HomeBackdrop(item: () -> MediaItem?) = Backdrop(item(), settleMs = 300)
 
 @Composable
 private fun HeroInfo(item: () -> MediaItem?, modifier: Modifier = Modifier) {

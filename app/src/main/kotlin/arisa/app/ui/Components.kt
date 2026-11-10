@@ -1,6 +1,7 @@
 package arisa.app.ui
 
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -26,7 +27,20 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import kotlinx.coroutines.NonCancellable
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.withContext
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -86,37 +100,80 @@ fun BlurImage(
 }
 
 /**
- * 全屏背景: 背景图 + 左侧、底部压暗, 用主色调做一点色偏. 切换时交叉淡入.
+ * 全屏背景: 背景图 + 左侧、底部压暗, 用主色调做一点色偏. 切换时新图在旧图上面淡入.
  * 压暗在后台线程画进图片里 (随图片缓存), 屏幕上只有一张图: 电视 GPU 弱, 每帧多画几层全屏就掉帧.
+ *
+ * [item] 一变就开始加载新图 (这时还看不见), 过 [settleMs] 后淡入. 首页传 300ms: 遥控器连按时背景不动,
+ * 换背景对电视 GPU 是重活. 这期间 [item] 又变了的话, 还没用上的那张直接丢掉, 它没下完的请求也跟着取消,
+ * 不和最后停下来的那张抢网络和 CPU. 图片只由这里加载一次, 不另外预加载 (两边各发一个请求的话会下载、解码两遍).
  */
 @Composable
-fun Backdrop(item: MediaItem?, modifier: Modifier = Modifier, dim: Float = 1f) {
-    val context = LocalContext.current
-    AnimatedContent(
-        targetState = item,
-        transitionSpec = { fadeIn(tween(200)) togetherWith fadeOut(tween(200)) },
-        contentKey = { it?.id },
-        modifier = modifier.fillMaxSize(),
-        label = "backdrop",
-    ) { current ->
-        Box(Modifier.fillMaxSize()) {
-            if (current != null) {
-                val tint = parseColor(current.art.color, Palette.Background)
-                val painter = rememberAsyncImagePainter(remember(current.id, dim) { backdropRequest(context, current, dim) })
-                val loaded = painter.state.collectAsState().value is AsyncImagePainter.State.Success
-                if (!loaded) {
-                    // 大图出来前的一小会儿: BlurHash 占位, 压暗现场画
-                    BlurImage(null, current.art.backdropBlurHash, Modifier.fillMaxSize(), fallback = tint)
-                    Box(Modifier.fillMaxSize().drawWithCache {
-                        val (left, bottom) = dimStops(tint, dim)
-                        val l = Brush.horizontalGradient(*left.toTypedArray())
-                        val b = Brush.verticalGradient(*bottom.toTypedArray())
-                        onDrawBehind { drawRect(l); drawRect(b) }
-                    })
-                }
-                Image(painter, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
+fun Backdrop(item: MediaItem?, modifier: Modifier = Modifier, dim: Float = 1f, settleMs: Long = 0) {
+    // 屏幕上的那张, 和正在加载、等着淡入的那张
+    var shown by remember { mutableStateOf(item) }
+    var incoming by remember { mutableStateOf<MediaItem?>(null) }
+    // 开始淡入了. 之前新图那一层只管加载, 占位图不用建
+    var revealing by remember { mutableStateOf(false) }
+    val fade = remember { Animatable(0f) }
+    val target by rememberUpdatedState(item)
+    LaunchedEffect(Unit) {
+        snapshotFlow { target }.collectLatest { t ->
+            if (t == null || t.id == shown?.id) {
+                incoming = null
+                if (t == null) delay(settleMs)
+                shown = t
+                return@collectLatest
+            }
+            revealing = false
+            incoming = t
+            delay(settleMs)
+            // 开始淡入后就做完, 中途焦点又动了也不打断 (打断的话淡到一半的图会突然消失)
+            withContext(NonCancellable) {
+                revealing = true
+                fade.snapTo(0f)
+                fade.animateTo(1f, tween(200))
+                shown = t
+                incoming = null
             }
         }
+    }
+    Box(modifier.fillMaxSize()) {
+        val coming = incoming
+        for (current in listOfNotNull(shown, coming)) {
+            key(current.id) {
+                val fadingIn = current === coming
+                BackdropImage(
+                    current, dim,
+                    placeholder = !fadingIn || revealing,
+                    // 淡入只改这一层的透明度. ModulateAlpha: 直接按透明度画, 不先画到一块全屏的离屏缓冲区再合成
+                    modifier = Modifier.fillMaxSize().graphicsLayer {
+                        alpha = if (fadingIn) fade.value else 1f
+                        compositingStrategy = CompositingStrategy.ModulateAlpha
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun BackdropImage(item: MediaItem, dim: Float, placeholder: Boolean, modifier: Modifier) {
+    val context = LocalContext.current
+    Box(modifier) {
+        val tint = parseColor(item.art.color, Palette.Background)
+        val painter = rememberAsyncImagePainter(remember(item.id, dim) { backdropRequest(context, item, dim) })
+        val loaded = painter.state.collectAsState().value is AsyncImagePainter.State.Success
+        if (!loaded && placeholder) {
+            // 大图出来前的一小会儿: BlurHash 占位, 压暗现场画
+            BlurImage(null, item.art.backdropBlurHash, Modifier.fillMaxSize(), fallback = tint)
+            Box(Modifier.fillMaxSize().drawWithCache {
+                val (left, bottom) = dimStops(tint, dim)
+                val l = Brush.horizontalGradient(*left.toTypedArray())
+                val b = Brush.verticalGradient(*bottom.toTypedArray())
+                onDrawBehind { drawRect(l); drawRect(b) }
+            })
+        }
+        Image(painter, null, Modifier.fillMaxSize(), contentScale = ContentScale.Crop)
     }
 }
 
@@ -156,7 +213,7 @@ private class DimTransformation(private val tint: Color, private val dim: Float)
     }
 }
 
-/** 固定尺寸, 预加载和显示用同一个缓存条目. */
+/** 固定尺寸: 不用等画到屏幕上才知道要多大, 新图还看不见的时候就能开始加载. */
 private fun backdropRequest(context: PlatformContext, item: MediaItem, dim: Float) =
     ImageRequest.Builder(context)
         .data(tmdbImage(item.backdrop, BACKDROP_SIZE))
@@ -345,9 +402,3 @@ fun minimalBringIntoView(trailingMargin: Float = 0f) = object : BringIntoViewSpe
 }
 
 private const val BACKDROP_SIZE = "w1280"
-
-/** 提前下载、处理好背景图放进缓存, 切过去时直接显示. */
-fun prefetchBackdrop(context: PlatformContext, item: MediaItem, dim: Float = 1f) {
-    if (item.backdrop == null) return
-    SingletonImageLoader.get(context).enqueue(backdropRequest(context, item, dim))
-}

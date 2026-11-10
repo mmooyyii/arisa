@@ -89,6 +89,9 @@ private val RESIZE_MODES = listOf(
 )
 private val SPEEDS = listOf(0.5f, 0.75f, 1f, 1.25f, 1.5f, 2f)
 
+/** 调了进度不按确定, 过这么久当作取消. */
+private const val SCRUB_CANCEL_MS = 10_000L
+
 /** 剩余这么多时间时提示下一集. */
 private const val NEXT_PROMPT_MS = 30_000L
 
@@ -146,21 +149,34 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
     }
 
     var interaction by remember { mutableLongStateOf(0L) }
+    // 正在调的进度 (还没按确定), 没在调时是 null
+    var scrub by remember { mutableStateOf<Long?>(null) }
+    var scrubJob by remember { mutableStateOf<Job?>(null) }
     fun touch() {
         osd = true
         interaction = System.currentTimeMillis()
     }
-    // 播放中 4 秒没操作就藏起进度条
-    LaunchedEffect(osd, interaction, playing, panel) {
-        if (osd && playing && !panel) {
+    // 播放中 4 秒没操作就藏起进度条; 正在调进度时不藏
+    LaunchedEffect(osd, interaction, playing, panel, scrub == null) {
+        if (osd && playing && !panel && scrub == null) {
             delay(4000)
             osd = false
         }
     }
 
-    // 快进快退先只动进度条, 停手 0.8 秒后才 seek, 避免网络流连续 seek
-    var scrub by remember { mutableStateOf<Long?>(null) }
-    var scrubJob by remember { mutableStateOf<Job?>(null) }
+    // 快进快退: 左右键只移动进度条上的位置, 按确定才跳过去, 按下去马上跳, 不等; 按返回取消.
+    // 调了位置一直不按确定的话, 过一会儿当作取消.
+    fun cancelScrub() {
+        scrubJob?.cancel()
+        scrub = null
+    }
+    fun commitScrub() {
+        val target = scrub ?: return
+        cancelScrub()
+        session.seekTo(target, forward = target >= player.currentPosition)
+        position = target
+        touch()
+    }
     fun scrubBy(direction: Int, repeat: Int) {
         val step = when {
             repeat < 6 -> 10_000L
@@ -168,13 +184,11 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
             else -> 60_000L
         }
         val max = if (duration > 0) duration else Long.MAX_VALUE
-        scrub = ((scrub ?: position) + direction * step).coerceIn(0L, max)
+        scrub = ((scrub ?: player.currentPosition) + direction * step).coerceIn(0L, max)
         touch()
         scrubJob?.cancel()
         scrubJob = scope.launch {
-            delay(800)
-            scrub?.let { player.seekTo(it) }
-            position = scrub ?: position
+            delay(SCRUB_CANCEL_MS)
             scrub = null
         }
     }
@@ -185,6 +199,7 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
     LaunchedEffect(panel) { if (!panel) runCatching { rootFocus.requestFocus() } }
 
     fun back() = when {
+        scrub != null -> cancelScrub()
         panel -> panel = false
         osd && playing -> osd = false
         else -> onExit()
@@ -214,6 +229,7 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar -> {
                         if (repeat > 0) return@onKeyEvent true
                         when {
+                            scrub != null -> commitScrub()
                             session.error != null -> session.retry()
                             showNext -> session.playNext()
                             else -> {
@@ -381,7 +397,11 @@ private fun Osd(session: PlaybackSession, position: Long, duration: Long, buffer
                 }
             }
             Spacer(Modifier.height(10.dp))
-            Text("← → 快退快进   ↓ 字幕 · 音轨 · 更多", style = MaterialTheme.typography.labelSmall, color = Palette.TextTertiary)
+            Text(
+                if (scrub != null) "确定  跳到这里      返回  取消" else "← → 调进度, 确定跳转   ↓ 字幕 · 音轨 · 更多",
+                style = MaterialTheme.typography.labelSmall,
+                color = if (scrub != null) Palette.Accent else Palette.TextTertiary,
+            )
         }
     }
 }

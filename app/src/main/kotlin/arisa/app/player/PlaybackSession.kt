@@ -29,6 +29,7 @@ import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.exoplayer.ForwardingRenderer
 import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.SeekParameters
 import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
 import androidx.media3.exoplayer.text.TextOutput
 import androidx.media3.exoplayer.video.VideoRendererEventListener
@@ -105,8 +106,9 @@ class PlaybackSession(
         .setLoadControl(
             // 原盘码率高, 按字节限制缓冲: 缓冲在 Java 堆里, 电视的堆上限一般只有 192MB,
             // 取四成 (分段下载还要占 40MB 左右), 写死 200MB 会在网速快时把堆撑爆
+            // 起播、跳转后攒够 1 秒就开始播 (高码率原盘 1 秒就有 10MB 左右, 攒多了等得久); 播着播着卡住的话攒 5 秒再继续
             DefaultLoadControl.Builder()
-                .setBufferDurationsMs(15_000, 60_000, 2_500, 5_000)
+                .setBufferDurationsMs(15_000, 60_000, 1_000, 5_000)
                 .setTargetBufferBytes((Runtime.getRuntime().maxMemory() * 0.4).toInt())
                 .setPrioritizeTimeOverSizeThresholds(false)
                 .setBackBuffer(20_000, true)
@@ -177,7 +179,19 @@ class PlaybackSession(
     private var retries = 0
     private var droppedFrames = 0
 
+    /**
+     * 跳转. 落在关键帧上, 不要求精确到目标位置: 精确跳转要从前一个关键帧一帧帧解到目标才出画面,
+     * 4K HEVC 的关键帧间隔常有 5~10 秒, 电视上要解很久. 快进落在目标之后最近的关键帧, 快退落在之前最近的,
+     * 保证每按一下都确实往那个方向动了.
+     */
+    fun seekTo(positionMs: Long, forward: Boolean) {
+        player.setSeekParameters(if (forward) SeekParameters.NEXT_SYNC else SeekParameters.PREVIOUS_SYNC)
+        player.seekTo(positionMs)
+    }
+
     init {
+        // 从上次的位置接着播、出错后重试: 从前一个关键帧开始, 多看一两秒不会漏
+        player.setSeekParameters(SeekParameters.PREVIOUS_SYNC)
         applyDelays()
         player.addListener(listener())
         player.addAnalyticsListener(analytics())

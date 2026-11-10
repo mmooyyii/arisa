@@ -312,35 +312,38 @@ fun PosterCard(
         scale = CardDefaults.scale(focusedScale = 1.08f),
         border = focusBorder(),
     ) {
-        BlurImage(
-            url = tmdbImage(item.poster, "w342"),
-            blurHash = item.art.posterBlurHash,
-            modifier = Modifier.fillMaxSize(),
-            fallback = parseColor(item.art.color),
-        )
-        if (item.poster == null) {
-            Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.BottomStart) {
-                Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 3)
+        // Card 的内容是从上到下排的, 角标要叠在海报上面, 所以包一层 Box
+        Box(Modifier.fillMaxSize()) {
+            BlurImage(
+                url = tmdbImage(item.poster, "w342"),
+                blurHash = item.art.posterBlurHash,
+                modifier = Modifier.fillMaxSize(),
+                fallback = parseColor(item.art.color),
+            )
+            if (item.poster == null) {
+                Box(Modifier.fillMaxSize().padding(10.dp), contentAlignment = Alignment.BottomStart) {
+                    Text(item.title, style = MaterialTheme.typography.titleSmall, maxLines = 3)
+                }
             }
-        }
-        badge?.let {
-            Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.BottomStart) {
-                Text(
-                    it,
-                    style = MaterialTheme.typography.labelSmall,
-                    modifier = Modifier
-                        .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
-                        .padding(horizontal = 6.dp, vertical = 2.dp),
-                )
+            badge?.let {
+                Box(Modifier.fillMaxSize().padding(6.dp), contentAlignment = Alignment.BottomStart) {
+                    Text(
+                        it,
+                        style = MaterialTheme.typography.labelSmall,
+                        modifier = Modifier
+                            .background(Color.Black.copy(alpha = 0.65f), RoundedCornerShape(6.dp))
+                            .padding(horizontal = 6.dp, vertical = 2.dp),
+                    )
+                }
             }
+            WatchMarker(watch)
         }
-        WatchMarker(watch)
     }
 }
 
 /** 海报上的观看状态: 看完了打勾, 剧集没看完的标还剩几集, 电影看了一半的在底边画进度. 没看过的不标. */
 @Composable
-private fun WatchMarker(watch: WatchState) {
+private fun BoxScope.WatchMarker(watch: WatchState) {
     val label = when (watch) {
         WatchState.Watched -> "✓"
         is WatchState.Remaining -> "剩 ${watch.remaining} 集"

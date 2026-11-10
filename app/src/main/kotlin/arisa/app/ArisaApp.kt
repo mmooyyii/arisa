@@ -36,7 +36,10 @@ class ArisaApp : Application(), SingletonImageLoader.Factory {
     /** 登录了才和网盘同步进度, 演示模式不同步. */
     fun syncProgress(onlyIfDirty: Boolean) {
         if (session.demo || !session.isLoggedIn) return
-        scope.launch { if (onlyIfDirty) progress.syncIfDirty(session.client) else progress.sync(session.client) }
+        scope.launch {
+            val lib = library.library.value
+            if (onlyIfDirty) progress.syncIfDirty(session.client, lib) else progress.sync(session.client, lib)
+        }
     }
 
     val http: OkHttpClient by lazy {

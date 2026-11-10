@@ -21,10 +21,12 @@ import arisa.library.Library
 import arisa.library.MediaItem
 import arisa.library.MediaType
 import arisa.library.PlaybackProgress
+import arisa.library.ProgressSync
 
 /**
  * 观看进度, key = 文件 fid. 本地存一份, 网盘 /.arisa/progress-<设备ID>.json 存一份, 多台设备靠它同步:
  * 启动时和退出播放时合并 (同一个文件按更新时间新的为准), 本地有变化才写回网盘.
+ * 同步时顺便清掉片库里已经没有的文件的进度, 规则见 [ProgressSync.prune].
  */
 class ProgressStore(context: Context) {
     private val prefs = context.getSharedPreferences("progress", Context.MODE_PRIVATE)
@@ -65,21 +67,30 @@ class ProgressStore(context: Context) {
      *
      * 每台设备只写 progress-<设备ID>.json, 没有写冲突; 读的时候所有设备的文件一起合并,
      * 同一个视频取更新时间最新的. 本地在当前值上合并, 同步期间新存的进度不会被盖掉.
+     *
+     * [library] 是当前的片库, 用来清掉已经不在片库里的文件的进度; 还没加载出来时传 null, 这次不清.
      */
-    suspend fun sync(client: QuarkWebClient) = syncLock.withLock {
+    suspend fun sync(client: QuarkWebClient, library: Library?) = syncLock.withLock {
         withContext(Dispatchers.IO) {
             runCatching {
                 val dir = client.list(QuarkWebClient.ROOT).firstOrNull { it.isDir && it.name == LibraryCodec.DIR }
                     ?: return@runCatching
                 val startVersion = version.get()
+                val now = System.currentTimeMillis()
+                fun clean(all: Map<String, PlaybackProgress>) = if (library == null) all else ProgressSync.prune(all, library, now)
+
                 val files = client.list(dir.fid).filter { it.name.startsWith("progress-") && it.name.endsWith(".json") }
-                val remote = files
-                    .mapNotNull { f -> runCatching { json.decodeFromString(serializer, client.download(f.fid).decodeToString()) }.getOrNull() }
-                    .fold(emptyMap<String, PlaybackProgress>(), ::merge)
-                val merged = _all.updateAndGet { merge(it, remote) }
-                if (merged != remote) {
+                val contents = files.mapNotNull { f ->
+                    runCatching { json.decodeFromString(serializer, client.download(f.fid).decodeToString()) }.getOrNull()?.let { f to it }
+                }
+                // 旧版 App 不清理, 它的文件里还有该清的条目: 合并完按同一条规则再筛一遍
+                val remote = clean(contents.fold(emptyMap()) { acc, (_, m) -> ProgressSync.merge(acc, m) })
+                val merged = _all.updateAndGet { clean(ProgressSync.merge(it, remote)) }
+                val mine = files.filter { it.name.startsWith("progress-$device") }
+                // 自己的文件里有已经清掉的条目时也重写一次, 让网盘上的文件跟着变小
+                val stale = contents.any { (f, m) -> f in mine && m.keys.any { it !in merged } }
+                if (merged != remote || stale) {
                     // 夸克不覆盖同名文件: 先用临时名上传, 删掉自己的旧文件, 再改回正式名字
-                    val mine = files.filter { it.name.startsWith("progress-$device") }
                     val fid = client.upload(dir.fid, "progress-$device-${System.currentTimeMillis()}.json", json.encodeToString(serializer, merged).toByteArray())
                     if (mine.isNotEmpty()) client.delete(mine.map { it.fid })
                     client.rename(fid, "progress-$device.json")
@@ -90,12 +101,9 @@ class ProgressStore(context: Context) {
         }
     }
 
-    private fun merge(a: Map<String, PlaybackProgress>, b: Map<String, PlaybackProgress>) =
-        (a.keys + b.keys).associateWith { fid -> listOfNotNull(a[fid], b[fid]).maxBy { it.updatedAt } }
-
     /** 本地有改动才同步, 退出播放时用. */
-    suspend fun syncIfDirty(client: QuarkWebClient) {
-        if (dirty) sync(client)
+    suspend fun syncIfDirty(client: QuarkWebClient, library: Library?) {
+        if (dirty) sync(client, library)
     }
 
     /** 继续观看: 看了一半的, 以及看完一集后的下一集. 按最近观看排序, 只留最近 [CONTINUE_LIMIT] 个. */

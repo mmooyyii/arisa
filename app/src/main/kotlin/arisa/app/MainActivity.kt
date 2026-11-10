@@ -9,7 +9,16 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.runtime.Composable
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.LinearOutSlowInEasing
+import androidx.compose.animation.core.tween
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.SideEffect
+import androidx.compose.ui.graphics.CompositingStrategy
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
@@ -92,7 +101,21 @@ class MainActivity : ComponentActivity() {
         }
 
         val screen = stack.last()
-        saveable.SaveableStateProvider(screen.toString()) { when (screen) {
+        // 换页时新页面淡入, 同时从侧面滑进来一小段: 往里走从右边来, 返回从左边来. 旧页面直接换掉.
+        // 只动这一层的透明度和位置 (都是 GPU 上的变换): 不用缩放, 缩放的话整屏的字每一帧都要重新栅格化;
+        // ModulateAlpha 是直接按透明度画, 不先画到一块全屏的离屏缓冲区.
+        val depth = stack.size
+        val lastDepth = remember { intArrayOf(depth) }
+        val enter = remember(screen) { Enter(Animatable(0f), forward = depth >= lastDepth[0]) }
+        SideEffect { lastDepth[0] = depth }
+        LaunchedEffect(enter) { enter.progress.animateTo(1f, tween(220, easing = LinearOutSlowInEasing)) }
+        val slide = with(LocalDensity.current) { 36.dp.toPx() }
+        Box(Modifier.fillMaxSize().graphicsLayer {
+            val p = enter.progress.value
+            alpha = p
+            translationX = (1f - p) * slide * if (enter.forward) 1 else -1
+            compositingStrategy = CompositingStrategy.ModulateAlpha
+        }) { saveable.SaveableStateProvider(screen.toString()) { when (screen) {
             Screen.Home -> HomeScreen(
                 onOpen = { stack += Screen.Detail(it) },
                 onOpenCollection = { stack += Screen.Collection(it) },
@@ -119,6 +142,9 @@ class MainActivity : ComponentActivity() {
                 onOpenCollection = { stack += Screen.Collection(it) },
             )
             Screen.Settings -> SettingsScreen(onLogout = onLogout)
-        } }
+        } } }
     }
+
+    /** 一次换页的进场动画. */
+    private class Enter(val progress: Animatable<Float, AnimationVector1D>, val forward: Boolean)
 }

@@ -27,6 +27,13 @@ import androidx.media3.exoplayer.DefaultLoadControl
 import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.DecoderReuseEvaluation
 import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.exoplayer.ForwardingRenderer
+import androidx.media3.exoplayer.Renderer
+import androidx.media3.exoplayer.mediacodec.MediaCodecSelector
+import androidx.media3.exoplayer.text.TextOutput
+import androidx.media3.exoplayer.video.VideoRendererEventListener
+import android.os.Handler
+import android.os.Looper
 import androidx.media3.exoplayer.analytics.AnalyticsListener
 import androidx.media3.exoplayer.audio.AudioSink
 import androidx.media3.exoplayer.source.DefaultMediaSourceFactory
@@ -71,6 +78,10 @@ class PlaybackSession(
     private val app = ArisaApp.instance
     private val memory = TrackMemory(context)
 
+    // 播放线程每帧都要读, 单独存一份, 不读界面用的状态
+    @Volatile private var videoShiftUs = 0L
+    @Volatile private var textShiftUs = 0L
+
     /** 每秒从网络收到的字节数, 缓冲时显示. */
     var downloadRate by mutableStateOf(0L)
         private set
@@ -87,7 +98,7 @@ class PlaybackSession(
     val player: ExoPlayer = ExoPlayer.Builder(context)
         .setRenderersFactory(
             // 系统解码器 (和音频直通) 优先, 设备解不了的再交给 FFmpeg
-            DefaultRenderersFactory(context)
+            DelayRenderersFactory(context, videoShiftUs = { videoShiftUs }, textShiftUs = { textShiftUs })
                 .setExtensionRendererMode(DefaultRenderersFactory.EXTENSION_RENDERER_MODE_ON)
                 .setEnableDecoderFallback(true)
         )
@@ -119,6 +130,33 @@ class PlaybackSession(
     /** 记忆轨道用的 key: 同一部剧的所有集共用. */
     val memoryKey get() = item?.id ?: "fid:${file.fid}"
 
+    /** 字幕比画面晚多少毫秒 (负数是早), 字幕和声音对不上时调. 每部作品记住. */
+    var subtitleDelayMs by mutableStateOf(memory.get(memoryKey)?.subtitleDelayMs ?: 0L)
+        private set
+    /** 声音比画面晚多少毫秒 (负数是早). */
+    var audioDelayMs by mutableStateOf(memory.get(memoryKey)?.audioDelayMs ?: 0L)
+        private set
+
+    fun adjustSubtitleDelay(deltaMs: Long) = setDelays(subtitle = if (deltaMs == 0L) 0 else subtitleDelayMs + deltaMs, audio = audioDelayMs)
+
+    fun adjustAudioDelay(deltaMs: Long) = setDelays(subtitle = subtitleDelayMs, audio = if (deltaMs == 0L) 0 else audioDelayMs + deltaMs)
+
+    private fun setDelays(subtitle: Long, audio: Long) {
+        subtitleDelayMs = subtitle.coerceIn(-MAX_DELAY_MS, MAX_DELAY_MS)
+        audioDelayMs = audio.coerceIn(-MAX_DELAY_MS, MAX_DELAY_MS)
+        applyDelays()
+        memory.update(memoryKey) { it.copy(subtitleDelayMs = subtitleDelayMs, audioDelayMs = audioDelayMs) }
+    }
+
+    /**
+     * 播放器的时钟跟着声音走, 声音本身挪不了, 所以「声音晚一点」是让画面按更靠后的时间画 (画面早一点);
+     * 字幕要跟着画面, 在画面的基础上再减去字幕自己的延迟.
+     */
+    private fun applyDelays() {
+        videoShiftUs = audioDelayMs * 1000
+        textShiftUs = (audioDelayMs - subtitleDelayMs) * 1000
+    }
+
     val episodes: List<Episode> = item?.takeIf { it.type == MediaType.TV }
         ?.seasons?.flatMap { it.episodes }?.filter { it.files.isNotEmpty() }.orEmpty()
 
@@ -140,6 +178,7 @@ class PlaybackSession(
     private var droppedFrames = 0
 
     init {
+        applyDelays()
         player.addListener(listener())
         player.addAnalyticsListener(analytics())
         val on = Settings.subtitlesOn(context)
@@ -373,5 +412,41 @@ class PlaybackSession(
     fun release() {
         saveProgress()
         player.release()
+    }
+
+    private companion object {
+        const val MAX_DELAY_MS = 30_000L
+    }
+}
+
+/**
+ * 给画面和字幕加时间偏移, 用来调字幕延迟、声音延迟. 播放器每一轮告诉各个渲染器「现在播到哪了」,
+ * 这里把告诉画面、字幕渲染器的时间挪一下, 它们就早一点或晚一点出画面. 偏移是 0 时和原来完全一样.
+ */
+@OptIn(UnstableApi::class)
+private class DelayRenderersFactory(
+    context: Context,
+    private val videoShiftUs: () -> Long,
+    private val textShiftUs: () -> Long,
+) : DefaultRenderersFactory(context) {
+    private class Shifted(renderer: Renderer, private val shiftUs: () -> Long) : ForwardingRenderer(renderer) {
+        override fun render(positionUs: Long, elapsedRealtimeUs: Long) = super.render(positionUs + shiftUs(), elapsedRealtimeUs)
+        override fun getDurationToProgressUs(positionUs: Long, elapsedRealtimeUs: Long) =
+            super.getDurationToProgressUs(positionUs + shiftUs(), elapsedRealtimeUs)
+    }
+
+    override fun buildVideoRenderers(
+        context: Context, extensionRendererMode: Int, mediaCodecSelector: MediaCodecSelector, enableDecoderFallback: Boolean,
+        eventHandler: Handler, eventListener: VideoRendererEventListener, allowedVideoJoiningTimeMs: Long, out: ArrayList<Renderer>,
+    ) {
+        val from = out.size
+        super.buildVideoRenderers(context, extensionRendererMode, mediaCodecSelector, enableDecoderFallback, eventHandler, eventListener, allowedVideoJoiningTimeMs, out)
+        for (i in from until out.size) out[i] = Shifted(out[i], videoShiftUs)
+    }
+
+    override fun buildTextRenderers(context: Context, output: TextOutput, outputLooper: Looper, extensionRendererMode: Int, out: ArrayList<Renderer>) {
+        val from = out.size
+        super.buildTextRenderers(context, output, outputLooper, extensionRendererMode, out)
+        for (i in from until out.size) out[i] = Shifted(out[i], textShiftUs)
     }
 }

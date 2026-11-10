@@ -10,12 +10,19 @@ import kotlinx.serialization.json.Json
 @Serializable
 data class TrackChoice(val language: String? = null, val label: String? = null)
 
-/** 一部作品上次选的音轨和字幕. text == null 且 textOff 为 true 表示关了字幕. */
+/**
+ * 一部作品上次选的音轨和字幕. text == null 且 textOff 为 true 表示关了字幕.
+ * 延迟也记在这里: 同一部剧的各集一般出自同一个压制组, 字幕差多少是一样的.
+ */
 @Serializable
 data class TrackPrefs(
     val audio: TrackChoice? = null,
     val text: TrackChoice? = null,
     val textOff: Boolean = false,
+    /** 字幕比画面晚多少毫秒, 负数是早. */
+    val subtitleDelayMs: Long = 0,
+    /** 声音比画面晚多少毫秒, 负数是早. */
+    val audioDelayMs: Long = 0,
 )
 
 /** 每部作品各记各的, key 是作品 id (未识别的视频用 fid). 本地存. */

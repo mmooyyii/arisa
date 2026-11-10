@@ -482,6 +482,7 @@ private fun OptionsPanel(
                     add(Option("字幕样式", if (subtitleBackground) "半透明底" else "黑色描边", selected = false) {
                         onSubtitleBackground(!subtitleBackground)
                     })
+                    addAll(delayOptions("字幕", session.subtitleDelayMs, stepMs = 250, session::adjustSubtitleDelay))
                 }
                 OptionList(options)
             }
@@ -491,7 +492,8 @@ private fun OptionsPanel(
                         Option(TrackLabels.audio(g.getTrackFormat(i)), selected = g.isTrackSelected(i)) { session.select(g, i) }
                     }
                 }
-                if (options.isEmpty()) Text("没有可选的音轨", style = MaterialTheme.typography.bodyMedium) else OptionList(options)
+                if (options.isEmpty()) Text("没有可选的音轨", style = MaterialTheme.typography.bodyMedium)
+                else OptionList(options + delayOptions("声音", session.audioDelayMs, stepMs = 50, session::adjustAudioDelay))
             }
             PanelTab.PICTURE -> OptionList(
                 RESIZE_MODES.map { (name, mode) -> Option("画面 · $name", selected = resizeMode == mode) { onResizeMode(mode) } } +
@@ -510,6 +512,21 @@ private fun OptionsPanel(
             }
             PanelTab.INFO -> InfoLines(session)
         }
+    }
+}
+
+/** 调延迟的三项: 晚一点、早一点、归零. [adjust] 传 0 是归零. */
+private fun delayOptions(what: String, delayMs: Long, stepMs: Long, adjust: (Long) -> Unit): List<Option> {
+    val now = when {
+        delayMs == 0L -> "现在和画面对齐"
+        delayMs > 0 -> "现在比画面晚 %.2f 秒".format(delayMs / 1000.0)
+        else -> "现在比画面早 %.2f 秒".format(-delayMs / 1000.0)
+    }
+    val step = "%.2f".format(stepMs / 1000.0)
+    return buildList {
+        add(Option("${what}晚一点", "$now · 按一次 $step 秒", selected = false) { adjust(stepMs) })
+        add(Option("${what}早一点", "$now · 按一次 $step 秒", selected = false) { adjust(-stepMs) })
+        if (delayMs != 0L) add(Option("${what}延迟归零", selected = false) { adjust(0) })
     }
 }
 

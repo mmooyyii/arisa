@@ -20,7 +20,6 @@ import androidx.media3.common.Player
 import androidx.media3.common.TrackSelectionOverride
 import androidx.media3.common.Tracks
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.datasource.DefaultDataSource
 import androidx.media3.datasource.HttpDataSource
 import androidx.media3.datasource.okhttp.OkHttpDataSource
 import androidx.media3.exoplayer.DefaultLoadControl
@@ -44,10 +43,10 @@ import arisa.library.Episode
 import arisa.library.MediaFile
 import arisa.library.MediaType
 import arisa.library.SubtitleFile
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -241,27 +240,46 @@ class PlaybackSession(
         return true
     }
 
-    fun retry() = start(player.currentPosition)
+    fun retry() = start(player.currentPosition, fresh = true)
 
     fun setPlaybackSpeed(value: Float) {
         speed = value
         player.setPlaybackSpeed(value)
     }
 
-    private fun start(positionMs: Long) {
+    /**
+     * @param fresh 出错后重来: 直链重新取, 不用进详情页时提前取好的那个 (多半就是它过期了).
+     */
+    private fun start(positionMs: Long, fresh: Boolean = false) {
         startJob?.cancel()
         loading = true
         error = null
         val f = file
         startJob = scope.launch {
+            // 外挂字幕和直链同时取. 字幕不等: 轨道先建好, 内容下完了自己出来 (见 PendingSubtitleDataSource),
+            // 等的话每条字幕要多两次请求 (取直链、下载), 这段时间画面出不来
+            val sideloaded = if (app.session.demo) emptyList() else f.subtitles.mapNotNull { s ->
+                val mime = subtitleMime(s) ?: return@mapNotNull null
+                val file = async { runCatching { app.library.subtitle(s) }.getOrNull() }
+                val empty = if (mime == MimeTypes.TEXT_VTT) "WEBVTT\n\n".toByteArray() else ByteArray(0)
+                Triple(s, mime, PendingSubtitleDataSource.Subtitle(file, empty))
+            }
             val link = try {
-                app.library.playLink(f)
+                app.library.playLink(f, fresh)
+            } catch (e: CancellationException) {
+                throw e
             } catch (e: Exception) {
                 error = "获取播放地址失败: ${e.message}"
                 loading = false
                 return@launch
             }
-            val subtitles = f.subtitles.map { s -> async { runCatching { sideload(s) }.getOrNull() } }.awaitAll().filterNotNull()
+            val subtitles = sideloaded.map { (s, mime, _) ->
+                MediaItem.SubtitleConfiguration.Builder(PendingSubtitleDataSource.uri(s.fid))
+                    .setMimeType(mime)
+                    .setLanguage(s.language)
+                    .setLabel("外挂 " + s.name.substringBeforeLast('.').takeLast(24))
+                    .build()
+            }
             val http = OkHttpDataSource.Factory(app.http).setDefaultRequestProperties(link.headers).setTransferListener(transfers)
             val media = MediaItem.Builder()
                 .setUri(link.url)
@@ -269,27 +287,23 @@ class PlaybackSession(
                 .setMediaMetadata(MediaMetadata.Builder().setTitle(title).build())
                 .setSubtitleConfigurations(subtitles)
                 .build()
-            // DefaultDataSource 包一层, 外挂字幕是本地文件; 网络部分分段并发读 (夸克对不分段的请求限速)
-            player.setMediaSource(DefaultMediaSourceFactory(DefaultDataSource.Factory(context, ParallelRangeDataSource.Factory(http, link.size))).createMediaSource(media), positionMs)
+            // 网络部分分段并发读 (夸克对不分段的请求限速); 外面包一层, 外挂字幕从本地缓存读
+            val source = PendingSubtitleDataSource.Factory(
+                ParallelRangeDataSource.Factory(http, link.size),
+                sideloaded.associate { (s, _, pending) -> s.fid to pending },
+            )
+            player.setMediaSource(DefaultMediaSourceFactory(source).createMediaSource(media), positionMs)
             player.prepare()
             player.playWhenReady = true
             loading = false
         }
     }
 
-    private suspend fun sideload(s: SubtitleFile): MediaItem.SubtitleConfiguration? {
-        if (app.session.demo) return null
-        val mime = when (s.name.substringAfterLast('.').lowercase()) {
-            "srt" -> MimeTypes.APPLICATION_SUBRIP
-            "ass", "ssa" -> MimeTypes.TEXT_SSA
-            "vtt" -> MimeTypes.TEXT_VTT
-            else -> return null
-        }
-        return MediaItem.SubtitleConfiguration.Builder(Uri.fromFile(app.library.subtitle(s)))
-            .setMimeType(mime)
-            .setLanguage(s.language)
-            .setLabel("外挂 " + s.name.substringBeforeLast('.').takeLast(24))
-            .build()
+    private fun subtitleMime(s: SubtitleFile): String? = when (s.name.substringAfterLast('.').lowercase()) {
+        "srt" -> MimeTypes.APPLICATION_SUBRIP
+        "ass", "ssa" -> MimeTypes.TEXT_SSA
+        "vtt" -> MimeTypes.TEXT_VTT
+        else -> null
     }
 
     // ---------- 轨道 ----------
@@ -375,7 +389,7 @@ class PlaybackSession(
                 retries++
                 scope.launch {
                     delay(1000L * retries)
-                    start(position)
+                    start(position, fresh = true)
                 }
                 return
             }

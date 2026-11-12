@@ -53,9 +53,11 @@ class ArisaApp : Application(), SingletonImageLoader.Factory {
         super.onCreate()
         instance = this
         session = SessionStore(this, http)
-        library = LibraryRepository(this, session, http)
+        library = LibraryRepository(this, session, http, scope)
         progress = ProgressStore(this)
         updater = AppUpdater(this, session, http)
+        // 片库缓存现在就开始读: 和 Activity 创建、界面第一次组合同时进行, 首页出来时多半已经读好了
+        scope.launch { library.loadCached() }
     }
 
     override fun newImageLoader(context: PlatformContext): ImageLoader =

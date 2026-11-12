@@ -1,6 +1,7 @@
 package arisa.app.ui
 
 import androidx.compose.ui.platform.LocalDensity
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.focus.onFocusChanged
@@ -86,6 +87,13 @@ fun DetailScreen(
     val resume: Pair<Episode?, PlaybackProgress?> = remember(item, progress) { resumeTarget(item, episodes, progress) }
     val targetFid = resume.first?.files?.firstOrNull()?.fid ?: item.files.firstOrNull()?.fid
     val resumeProgress = resume.second
+    // 在这一页停了一会儿, 多半要播: 先把直链取好. 快速翻过去的页面不取
+    LaunchedEffect(targetFid) {
+        if (targetFid != null) {
+            delay(500)
+            app.library.prefetchLink(targetFid)
+        }
+    }
 
     Box(Modifier.fillMaxSize()) {
         Backdrop(item, dim = 1f)

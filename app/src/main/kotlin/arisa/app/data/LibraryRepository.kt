@@ -1,12 +1,7 @@
 package arisa.app.data
 
 import android.content.Context
-import android.os.SystemClock
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.async
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -38,8 +33,6 @@ class LibraryRepository(
     private val context: Context,
     private val session: SessionStore,
     private val http: OkHttpClient,
-    /** 不跟着页面走的后台任务: 提前取直链. */
-    private val scope: CoroutineScope,
 ) {
     sealed interface Status {
         data object Idle : Status
@@ -134,7 +127,6 @@ class LibraryRepository(
         cacheFile.delete()
         cacheNameFile.delete()
         dirFidFile.delete()
-        prefetched = null
         _library.value = null
     }
 
@@ -170,50 +162,10 @@ class LibraryRepository(
         return index?.takeIf { it.library === lib } ?: Index(lib).also { index = it }
     }
 
-    /** 提前取好的直链. 只留最近的一个 (详情页上默认要播的那个文件). */
-    private class Prefetched(val fid: String, val link: Deferred<QuarkLink>, private val at: Long) {
-        fun fresh() = SystemClock.elapsedRealtime() - at < LINK_TTL_MS
-    }
-
-    @Volatile private var prefetched: Prefetched? = null
-
-    /**
-     * 进详情页时把默认要播的那个文件的直链先取好, 按播放时少等一次请求.
-     * 顺手用它发一个 1 字节的请求: 和夸克下载服务器的连接 (DNS、TLS 握手) 先建好留在连接池里, 起播的第一个请求直接用.
-     */
-    fun prefetchLink(fid: String) {
-        if (session.demo || !session.isLoggedIn) return
-        if (prefetched?.let { it.fid == fid && it.fresh() } == true) return
-        val client = session.client
-        prefetched = Prefetched(
-            fid,
-            scope.async(Dispatchers.IO) { client.downloadLink(fid).also { link -> scope.launch(Dispatchers.IO) { runCatching { warm(link) } } } },
-            SystemClock.elapsedRealtime(),
-        )
-    }
-
-    private fun warm(link: QuarkLink) {
-        val req = Request.Builder().url(link.url).apply { link.headers.forEach { (k, v) -> header(k, v) } }
-            .header("Range", "bytes=0-0").build()
-        // 读完才会把连接还给连接池
-        http.newCall(req).execute().use { it.body?.bytes() }
-    }
-
-    /**
-     * 播放用的原文件直链 (要带 Cookie). 直链会过期: 提前取好的只在 [LINK_TTL_MS] 内用, 否则现取.
-     *
-     * @param fresh 一定现取 (播放出错后重试, 手上的直链多半已经失效).
-     */
-    suspend fun playLink(file: MediaFile, fresh: Boolean = false): QuarkLink {
-        if (session.demo) return QuarkLink(DEMO_VIDEO)
-        val ready = prefetched
-        if (fresh) {
-            prefetched = null
-        } else if (ready != null && ready.fid == file.fid && ready.fresh()) {
-            // 提前取的那次失败了就照常现取
-            runCatching { ready.link.await() }.getOrNull()?.let { return it }
-        }
-        return withContext(Dispatchers.IO) { session.client.downloadLink(file.fid) }
+    /** 播放用的原文件直链 (要带 Cookie), 每次播放前现取 (直链会过期). */
+    suspend fun playLink(file: MediaFile): QuarkLink = withContext(Dispatchers.IO) {
+        if (session.demo) return@withContext QuarkLink(DEMO_VIDEO)
+        session.client.downloadLink(file.fid)
     }
 
     /**
@@ -255,12 +207,6 @@ class LibraryRepository(
     }
 
     companion object {
-        /**
-         * 提前取的直链最多放这么久. 夸克直链的有效期没有公开的说法, 取短一点;
-         * 真过期了播放器会报错, 走出错重试那条路现取一个新的.
-         */
-        const val LINK_TTL_MS = 5 * 60_000L
-
         /** 演示模式下所有片子都播这个. */
         const val DEMO_VIDEO = "https://archive.org/download/BigBuckBunny_124/Content/big_buck_bunny_720p_surround.mp4"
     }

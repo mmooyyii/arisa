@@ -240,17 +240,14 @@ class PlaybackSession(
         return true
     }
 
-    fun retry() = start(player.currentPosition, fresh = true)
+    fun retry() = start(player.currentPosition)
 
     fun setPlaybackSpeed(value: Float) {
         speed = value
         player.setPlaybackSpeed(value)
     }
 
-    /**
-     * @param fresh 出错后重来: 直链重新取, 不用进详情页时提前取好的那个 (多半就是它过期了).
-     */
-    private fun start(positionMs: Long, fresh: Boolean = false) {
+    private fun start(positionMs: Long) {
         startJob?.cancel()
         loading = true
         error = null
@@ -265,7 +262,7 @@ class PlaybackSession(
                 Triple(s, mime, PendingSubtitleDataSource.Subtitle(file, empty))
             }
             val link = try {
-                app.library.playLink(f, fresh)
+                app.library.playLink(f)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -389,7 +386,7 @@ class PlaybackSession(
                 retries++
                 scope.launch {
                     delay(1000L * retries)
-                    start(position, fresh = true)
+                    start(position)
                 }
                 return
             }

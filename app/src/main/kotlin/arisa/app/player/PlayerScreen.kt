@@ -11,6 +11,12 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -97,11 +103,15 @@ private const val NEXT_PROMPT_MS = 30_000L
 
 /**
  * 遥控器操作:
- * - 确定 / 播放键: 暂停、继续 (出现「下一集」提示时是播下一集)
- * - 左右: 快退快进, 按住越跳越快, 松开后才真正跳过去
- * - 上: 显示进度和信息; 进度条显示着时再按上, 选中「上一集」「下一集」按钮 (有的话), 左右切换, 确定跳过去
- * - 下: 字幕、音轨、画面、剧集选项
- * - 返回: 先关面板 / 隐藏进度条, 再退出
+ * 进度条下面一行按钮: 上一集、下一集 (有的才放)、字幕·音轨·更多. 焦点要么在进度条上, 要么在按钮上.
+ *
+ * 焦点在进度条上 (默认):
+ * - 确定 / 播放键: 暂停、继续 (出现「下一集」提示时是播下一集); 调了进度时是跳过去
+ * - 左右: 调进度, 按住越跳越快, 按确定才跳过去
+ * - 上: 显示进度条; 下: 到按钮那一行 (进度条藏着时直接显示并选中按钮)
+ * 焦点在按钮上: 左右选按钮, 确定执行, 上或返回回到进度条. 进度条藏起来时焦点回到进度条.
+ *
+ * 菜单键直接打开选项面板. 返回: 先取消调进度 / 回到进度条 / 关面板 / 藏进度条, 再退出.
  */
 @OptIn(UnstableApi::class)
 @Composable
@@ -113,6 +123,9 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
     var buffered by remember { mutableLongStateOf(0L) }
+    // 进度条上显示的位置, 只在进度条显示着时更新: 进度条藏着时也一直留在界面上 (只是透明),
+    // 用 position 的话藏着也要每秒重组一次
+    var osdPosition by remember { mutableLongStateOf(0L) }
     var playing by remember { mutableStateOf(false) }
     var buffering by remember { mutableStateOf(true) }
     var osd by remember { mutableStateOf(true) }
@@ -129,8 +142,9 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
     LaunchedEffect(osd) {
         while (true) {
             position = player.currentPosition
+            if (osd) osdPosition = position
             duration = player.duration.takeIf { it != C.TIME_UNSET && it > 0 } ?: 0L
-            buffered = player.bufferedPosition
+            if (osd) buffered = player.bufferedPosition
             playing = player.isPlaying
             buffering = player.playbackState == Player.STATE_BUFFERING || player.playbackState == Player.STATE_IDLE
             delay(if (osd || showNext) 250 else 1000)
@@ -157,13 +171,17 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
         osd = true
         interaction = System.currentTimeMillis()
     }
-    // 播放中 4 秒没操作就藏起进度条; 正在调进度时不藏
-    LaunchedEffect(osd, interaction, playing, panel, scrub == null) {
+    // 焦点在按钮那一行时选中的是第几个, 在进度条上时是 null
+    var buttonFocus by remember { mutableStateOf<Int?>(null) }
+    // 播放中没操作就藏起进度条: 焦点在进度条上 4 秒, 在按钮上 10 秒 (要留时间看清选哪个); 正在调进度时不藏.
+    // 藏起来后焦点回到进度条
+    LaunchedEffect(osd, interaction, playing, panel, scrub == null, buttonFocus == null) {
         if (osd && playing && !panel && scrub == null) {
-            delay(4000)
+            delay(if (buttonFocus == null) 4000 else 10_000)
             osd = false
         }
     }
+    LaunchedEffect(osd) { if (!osd) buttonFocus = null }
 
     // 快进快退: 左右键只移动进度条上的位置, 按确定才跳过去, 按下去马上跳, 不等; 按返回取消.
     // 调了位置一直不按确定的话, 过一会儿当作取消.
@@ -176,6 +194,7 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
         cancelScrub()
         session.seekTo(target, forward = target >= player.currentPosition)
         position = target
+        osdPosition = target
         touch()
     }
     fun scrubBy(direction: Int, repeat: Int) {
@@ -196,23 +215,26 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
 
     val next = session.nextEpisode
 
-    // 进度条上的「上一集」「下一集」按钮, 只放有的那个. 选中的按钮下标, 没选中时是 null
-    val episodeButtons = listOfNotNull(
-        session.previousEpisode?.let { EpisodeButton("上一集") { session.playPrevious() } },
-        next?.let { EpisodeButton("下一集") { session.playNext() } },
+    // 进度条下面的按钮. 换集后按钮个数会变, 选中的下标跟着收回来
+    val buttons = listOfNotNull(
+        session.previousEpisode?.let { OsdButton("上一集") { session.playPrevious() } },
+        next?.let { OsdButton("下一集") { session.playNext() } },
+        OsdButton("字幕 · 音轨 · 更多") { panel = true },
     )
-    var buttonFocus by remember { mutableStateOf<Int?>(null) }
-    // 换了集、按钮变少了, 选中的跟着收回来
-    val focusedButton = buttonFocus?.takeIf { it in episodeButtons.indices }
-    // 进度条藏起来时取消选中, 下次出来还是调进度
-    LaunchedEffect(osd) { if (!osd) buttonFocus = null }
+    val focusedButton = buttonFocus?.coerceIn(buttons.indices)
+    /** 到按钮那一行, 默认选下一集, 没有下一集选第一个. */
+    fun focusButtons() {
+        cancelScrub()
+        buttonFocus = buttons.indexOfFirst { it.title == "下一集" }.coerceAtLeast(0)
+        touch()
+    }
 
     val rootFocus = remember { FocusRequester() }
     LaunchedEffect(panel) { if (!panel) runCatching { rootFocus.requestFocus() } }
 
     fun back() = when {
-        focusedButton != null -> buttonFocus = null
         scrub != null -> cancelScrub()
+        focusedButton != null -> { buttonFocus = null; touch() }
         panel -> panel = false
         osd && playing -> osd = false
         else -> onExit()
@@ -238,23 +260,27 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
             .onKeyEvent { e ->
                 if (panel || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 val repeat = e.nativeKeyEvent.repeatCount
-                // 选中了上一集、下一集按钮时: 左右在按钮间切换, 确定跳过去, 下键回到进度条
-                val selected = focusedButton?.takeIf { osd }
+                val selected = focusedButton
                 if (selected != null) {
                     when (e.key) {
-                        Key.DirectionLeft -> { buttonFocus = (selected - 1).coerceAtLeast(0); touch() }
-                        Key.DirectionRight -> { buttonFocus = (selected + 1).coerceAtMost(episodeButtons.lastIndex); touch() }
+                        Key.DirectionLeft -> buttonFocus = (selected - 1).coerceAtLeast(0)
+                        Key.DirectionRight -> buttonFocus = (selected + 1).coerceAtMost(buttons.lastIndex)
                         Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar -> {
-                            if (repeat == 0) {
-                                buttonFocus = null
-                                episodeButtons[selected].onClick()
-                                touch()
-                            }
+                            if (repeat > 0) return@onKeyEvent true
+                            buttonFocus = null
+                            buttons[selected].onClick()
                         }
-                        Key.DirectionDown -> { buttonFocus = null; touch() }
-                        Key.DirectionUp -> touch()
+                        Key.DirectionUp -> buttonFocus = null
+                        Key.DirectionDown -> {}
+                        Key.MediaPlayPause -> if (player.isPlaying) player.pause() else player.play()
+                        Key.MediaPlay -> player.play()
+                        Key.MediaPause -> player.pause()
+                        Key.Menu -> { panel = true; osd = false }
+                        Key.MediaNext -> session.playNext()
+                        Key.MediaPrevious -> session.playPrevious()
                         else -> return@onKeyEvent false
                     }
+                    if (!panel) touch()
                     return@onKeyEvent true
                 }
                 when (e.key) {
@@ -275,12 +301,9 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
                     Key.MediaPause -> { player.pause(); touch() }
                     Key.DirectionLeft, Key.MediaRewind -> scrubBy(-1, repeat)
                     Key.DirectionRight, Key.MediaFastForward -> scrubBy(1, repeat)
-                    Key.DirectionUp -> {
-                        // 进度条已经显示着、又没在调进度时, 再按上选中按钮 (默认选下一集)
-                        if (osd && scrub == null && episodeButtons.isNotEmpty()) buttonFocus = episodeButtons.lastIndex
-                        touch()
-                    }
-                    Key.DirectionDown, Key.Menu -> { panel = true; osd = false }
+                    Key.DirectionUp -> touch()
+                    Key.DirectionDown -> if (repeat == 0) focusButtons()
+                    Key.Menu -> { panel = true; osd = false }
                     Key.MediaNext -> session.playNext()
                     Key.MediaPrevious -> session.playPrevious()
                     else -> return@onKeyEvent false
@@ -301,7 +324,8 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
             },
             update = { view ->
                 view.resizeMode = resizeMode
-                view.subtitleView?.let { styleSubtitles(it, subtitleSize, subtitleBackground) }
+                // 进度条显示着时字幕抬到进度条上面, 不然会压在按钮上
+                view.subtitleView?.let { styleSubtitles(it, subtitleSize, subtitleBackground, raised = osd && !panel) }
             },
             modifier = Modifier.fillMaxSize(),
         )
@@ -321,19 +345,24 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
             ) {
                 Text(message, style = MaterialTheme.typography.titleMedium)
                 Spacer(Modifier.height(12.dp))
-                Text("按确定重试 · 按下键打开选项 · 按返回退出", style = MaterialTheme.typography.bodySmall)
+                Text("按确定重试 · 按下键换集或打开选项 · 按返回退出", style = MaterialTheme.typography.bodySmall)
             }
         }
 
-        AnimatedVisibility(visible = osd && !panel, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-            Osd(session, position, duration, buffered, scrub, playing, buffering || session.loading, episodeButtons, focusedButton)
-        }
+        // 进度条一直留着, 显示、隐藏只改透明度: 用 AnimatedVisibility 的话藏起来就整个销毁,
+        // 下次出来要重建、所有文字重新排版, 电视上那一帧要 60ms
+        val osdAlpha by animateFloatAsState(if (osd && !panel) 1f else 0f, label = "osd")
+        Osd(
+            session, osdPosition, duration, buffered, scrub, playing, buffering || session.loading, buttons, focusedButton,
+            // ModulateAlpha: 透明度直接乘到每个绘制上, 不先画到离屏缓冲再合成, 电视的 GPU 吃不消全屏离屏缓冲
+            Modifier.fillMaxSize().graphicsLayer { alpha = osdAlpha; compositingStrategy = CompositingStrategy.ModulateAlpha },
+        )
 
         AnimatedVisibility(
             visible = showNext,
             enter = fadeIn(),
             exit = fadeOut(),
-            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 56.dp, bottom = if (osd) 150.dp else 56.dp),
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 56.dp, bottom = if (osd) 200.dp else 56.dp),
         ) {
             next?.let { ep ->
                 Column(Modifier.width(320.dp).background(Palette.Surface.copy(alpha = 0.92f), RoundedCornerShape(12.dp)).padding(18.dp)) {
@@ -367,7 +396,7 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
 }
 
 @OptIn(UnstableApi::class)
-private fun styleSubtitles(view: SubtitleView, sizeIndex: Int, background: Boolean) {
+private fun styleSubtitles(view: SubtitleView, sizeIndex: Int, background: Boolean, raised: Boolean) {
     view.setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION * Settings.SUBTITLE_SIZES[sizeIndex].second)
     view.setStyle(
         CaptionStyleCompat(
@@ -382,18 +411,18 @@ private fun styleSubtitles(view: SubtitleView, sizeIndex: Int, background: Boole
     // ASS 字幕自带的位置、颜色保留, 字号按上面统一
     view.setApplyEmbeddedStyles(true)
     view.setApplyEmbeddedFontSizes(false)
-    view.setBottomPaddingFraction(0.06f)
+    view.setBottomPaddingFraction(if (raised) 0.3f else 0.06f)
 }
 
 @OptIn(UnstableApi::class)
 @Composable
 private fun Osd(
     session: PlaybackSession, position: Long, duration: Long, buffered: Long, scrub: Long?, playing: Boolean, buffering: Boolean,
-    episodeButtons: List<EpisodeButton>, focusedButton: Int?,
+    buttons: List<OsdButton>, focusedButton: Int?, modifier: Modifier,
 ) {
     val shown = scrub ?: position
     val clock = remember { SimpleDateFormat("HH:mm", Locale.CHINA) }
-    Box(Modifier.fillMaxSize()) {
+    Box(modifier) {
         // 顶部: 片名、集数、时间
         Row(
             Modifier.fillMaxWidth().align(Alignment.TopCenter)
@@ -418,13 +447,11 @@ private fun Osd(
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))))
                 .padding(start = 56.dp, end = 56.dp, top = 56.dp, bottom = 32.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 formatTags(session).forEach { Tag(it) }
-                Spacer(Modifier.weight(1f))
-                episodeButtons.forEachIndexed { i, b -> EpisodeButtonView(b.title, focused = i == focusedButton) }
             }
             Spacer(Modifier.height(14.dp))
-            ProgressBar(shown, buffered, duration, scrubbing = scrub != null)
+            ProgressBar(shown, buffered, duration, scrubbing = scrub != null, focused = focusedButton == null)
             Spacer(Modifier.height(10.dp))
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Text(formatClock(shown), style = MaterialTheme.typography.titleSmall)
@@ -438,26 +465,29 @@ private fun Osd(
                     Text("-${formatClock(duration - shown)}", style = MaterialTheme.typography.titleSmall)
                 }
             }
-            Spacer(Modifier.height(10.dp))
-            Text(
-                when {
-                    scrub != null -> "确定  跳到这里      返回  取消"
-                    focusedButton != null -> "← → 选择, 确定播放   ↓ 返回进度条"
-                    else -> "← → 调进度, 确定跳转   ↓ 字幕 · 音轨 · 更多" +
-                        if (episodeButtons.isNotEmpty()) "   ↑ " + episodeButtons.joinToString(" · ") { it.title } else ""
-                },
-                style = MaterialTheme.typography.labelSmall,
-                color = if (scrub != null || focusedButton != null) Palette.Accent else Palette.TextTertiary,
-            )
+            Spacer(Modifier.height(14.dp))
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                buttons.forEachIndexed { i, b -> OsdButtonView(b.title, focused = i == focusedButton) }
+                Spacer(Modifier.weight(1f))
+                Text(
+                    when {
+                        scrub != null -> "确定 跳到这里 · 返回 取消"
+                        focusedButton != null -> "← → 选择 · 确定 · ↑ 回到进度条"
+                        else -> "← → 调进度 · 确定 跳转 · ↓ 选按钮"
+                    },
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (scrub != null) Palette.Accent else Palette.TextTertiary,
+                )
+            }
         }
     }
 }
 
-private class EpisodeButton(val title: String, val onClick: () -> Unit)
+private class OsdButton(val title: String, val onClick: () -> Unit)
 
-/** 进度条上的按钮. 焦点不走 Compose (左右键在根上处理), 只按 [focused] 画选中的样子. */
+/** 进度条下面的按钮. 焦点不走 Compose (按键都在根上处理), 只按 [focused] 画选中的样子. */
 @Composable
-private fun EpisodeButtonView(title: String, focused: Boolean) {
+private fun OsdButtonView(title: String, focused: Boolean) {
     Text(
         title,
         style = MaterialTheme.typography.labelLarge,
@@ -481,13 +511,26 @@ private fun PauseMark(modifier: Modifier) {
     }
 }
 
+/** 焦点在进度条上时, 当前位置画一个圆点. */
 @Composable
-private fun ProgressBar(position: Long, buffered: Long, duration: Long, scrubbing: Boolean) {
+private fun ProgressBar(position: Long, buffered: Long, duration: Long, scrubbing: Boolean, focused: Boolean) {
     // 时长还不知道时只画底条
     val total = if (duration > 0) duration.toFloat() else Float.MAX_VALUE
-    Box(Modifier.fillMaxWidth().height(if (scrubbing) 8.dp else 5.dp).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.2f))) {
-        Box(Modifier.fillMaxHeight().fillMaxWidth((buffered / total).coerceIn(0f, 1f)).background(Color.White.copy(alpha = 0.35f)))
-        Box(Modifier.fillMaxHeight().fillMaxWidth((position / total).coerceIn(0f, 1f)).background(if (scrubbing) Palette.Accent else Color.White))
+    val played = (position / total).coerceIn(0f, 1f)
+    val barHeight = if (scrubbing) 8.dp else 5.dp
+    val color = when {
+        scrubbing -> Palette.Accent
+        focused -> Color.White
+        else -> Color.White.copy(alpha = 0.6f)
+    }
+    BoxWithConstraints(Modifier.fillMaxWidth().height(16.dp), contentAlignment = Alignment.CenterStart) {
+        Box(Modifier.fillMaxWidth().height(barHeight).clip(RoundedCornerShape(4.dp)).background(Color.White.copy(alpha = 0.2f))) {
+            Box(Modifier.fillMaxHeight().fillMaxWidth((buffered / total).coerceIn(0f, 1f)).background(Color.White.copy(alpha = 0.35f)))
+            Box(Modifier.fillMaxHeight().fillMaxWidth(played).background(color))
+        }
+        if (focused) {
+            Box(Modifier.offset(x = maxWidth * played - 8.dp).size(16.dp).background(color, CircleShape))
+        }
     }
 }
 

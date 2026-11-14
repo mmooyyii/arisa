@@ -99,7 +99,8 @@ private const val NEXT_PROMPT_MS = 30_000L
  * 遥控器操作:
  * - 确定 / 播放键: 暂停、继续 (出现「下一集」提示时是播下一集)
  * - 左右: 快退快进, 按住越跳越快, 松开后才真正跳过去
- * - 上: 显示进度和信息; 下: 字幕、音轨、画面、剧集选项
+ * - 上: 显示进度和信息; 进度条显示着时再按上, 选中「上一集」「下一集」按钮 (有的话), 左右切换, 确定跳过去
+ * - 下: 字幕、音轨、画面、剧集选项
  * - 返回: 先关面板 / 隐藏进度条, 再退出
  */
 @OptIn(UnstableApi::class)
@@ -195,10 +196,22 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
 
     val next = session.nextEpisode
 
+    // 进度条上的「上一集」「下一集」按钮, 只放有的那个. 选中的按钮下标, 没选中时是 null
+    val episodeButtons = listOfNotNull(
+        session.previousEpisode?.let { EpisodeButton("上一集") { session.playPrevious() } },
+        next?.let { EpisodeButton("下一集") { session.playNext() } },
+    )
+    var buttonFocus by remember { mutableStateOf<Int?>(null) }
+    // 换了集、按钮变少了, 选中的跟着收回来
+    val focusedButton = buttonFocus?.takeIf { it in episodeButtons.indices }
+    // 进度条藏起来时取消选中, 下次出来还是调进度
+    LaunchedEffect(osd) { if (!osd) buttonFocus = null }
+
     val rootFocus = remember { FocusRequester() }
     LaunchedEffect(panel) { if (!panel) runCatching { rootFocus.requestFocus() } }
 
     fun back() = when {
+        focusedButton != null -> buttonFocus = null
         scrub != null -> cancelScrub()
         panel -> panel = false
         osd && playing -> osd = false
@@ -225,6 +238,25 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
             .onKeyEvent { e ->
                 if (panel || e.type != KeyEventType.KeyDown) return@onKeyEvent false
                 val repeat = e.nativeKeyEvent.repeatCount
+                // 选中了上一集、下一集按钮时: 左右在按钮间切换, 确定跳过去, 下键回到进度条
+                val selected = focusedButton?.takeIf { osd }
+                if (selected != null) {
+                    when (e.key) {
+                        Key.DirectionLeft -> { buttonFocus = (selected - 1).coerceAtLeast(0); touch() }
+                        Key.DirectionRight -> { buttonFocus = (selected + 1).coerceAtMost(episodeButtons.lastIndex); touch() }
+                        Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar -> {
+                            if (repeat == 0) {
+                                buttonFocus = null
+                                episodeButtons[selected].onClick()
+                                touch()
+                            }
+                        }
+                        Key.DirectionDown -> { buttonFocus = null; touch() }
+                        Key.DirectionUp -> touch()
+                        else -> return@onKeyEvent false
+                    }
+                    return@onKeyEvent true
+                }
                 when (e.key) {
                     Key.DirectionCenter, Key.Enter, Key.NumPadEnter, Key.Spacebar -> {
                         if (repeat > 0) return@onKeyEvent true
@@ -243,9 +275,14 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
                     Key.MediaPause -> { player.pause(); touch() }
                     Key.DirectionLeft, Key.MediaRewind -> scrubBy(-1, repeat)
                     Key.DirectionRight, Key.MediaFastForward -> scrubBy(1, repeat)
-                    Key.DirectionUp -> touch()
+                    Key.DirectionUp -> {
+                        // 进度条已经显示着、又没在调进度时, 再按上选中按钮 (默认选下一集)
+                        if (osd && scrub == null && episodeButtons.isNotEmpty()) buttonFocus = episodeButtons.lastIndex
+                        touch()
+                    }
                     Key.DirectionDown, Key.Menu -> { panel = true; osd = false }
                     Key.MediaNext -> session.playNext()
+                    Key.MediaPrevious -> session.playPrevious()
                     else -> return@onKeyEvent false
                 }
                 true
@@ -289,7 +326,7 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
         }
 
         AnimatedVisibility(visible = osd && !panel, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
-            Osd(session, position, duration, buffered, scrub, playing, buffering || session.loading)
+            Osd(session, position, duration, buffered, scrub, playing, buffering || session.loading, episodeButtons, focusedButton)
         }
 
         AnimatedVisibility(
@@ -350,7 +387,10 @@ private fun styleSubtitles(view: SubtitleView, sizeIndex: Int, background: Boole
 
 @OptIn(UnstableApi::class)
 @Composable
-private fun Osd(session: PlaybackSession, position: Long, duration: Long, buffered: Long, scrub: Long?, playing: Boolean, buffering: Boolean) {
+private fun Osd(
+    session: PlaybackSession, position: Long, duration: Long, buffered: Long, scrub: Long?, playing: Boolean, buffering: Boolean,
+    episodeButtons: List<EpisodeButton>, focusedButton: Int?,
+) {
     val shown = scrub ?: position
     val clock = remember { SimpleDateFormat("HH:mm", Locale.CHINA) }
     Box(Modifier.fillMaxSize()) {
@@ -378,8 +418,10 @@ private fun Osd(session: PlaybackSession, position: Long, duration: Long, buffer
                 .background(Brush.verticalGradient(listOf(Color.Transparent, Color.Black.copy(alpha = 0.8f))))
                 .padding(start = 56.dp, end = 56.dp, top = 56.dp, bottom = 32.dp),
         ) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
                 formatTags(session).forEach { Tag(it) }
+                Spacer(Modifier.weight(1f))
+                episodeButtons.forEachIndexed { i, b -> EpisodeButtonView(b.title, focused = i == focusedButton) }
             }
             Spacer(Modifier.height(14.dp))
             ProgressBar(shown, buffered, duration, scrubbing = scrub != null)
@@ -398,12 +440,32 @@ private fun Osd(session: PlaybackSession, position: Long, duration: Long, buffer
             }
             Spacer(Modifier.height(10.dp))
             Text(
-                if (scrub != null) "确定  跳到这里      返回  取消" else "← → 调进度, 确定跳转   ↓ 字幕 · 音轨 · 更多",
+                when {
+                    scrub != null -> "确定  跳到这里      返回  取消"
+                    focusedButton != null -> "← → 选择, 确定播放   ↓ 返回进度条"
+                    else -> "← → 调进度, 确定跳转   ↓ 字幕 · 音轨 · 更多" +
+                        if (episodeButtons.isNotEmpty()) "   ↑ " + episodeButtons.joinToString(" · ") { it.title } else ""
+                },
                 style = MaterialTheme.typography.labelSmall,
-                color = if (scrub != null) Palette.Accent else Palette.TextTertiary,
+                color = if (scrub != null || focusedButton != null) Palette.Accent else Palette.TextTertiary,
             )
         }
     }
+}
+
+private class EpisodeButton(val title: String, val onClick: () -> Unit)
+
+/** 进度条上的按钮. 焦点不走 Compose (左右键在根上处理), 只按 [focused] 画选中的样子. */
+@Composable
+private fun EpisodeButtonView(title: String, focused: Boolean) {
+    Text(
+        title,
+        style = MaterialTheme.typography.labelLarge,
+        color = if (focused) Color.Black else Palette.Text,
+        modifier = Modifier
+            .background(if (focused) Color.White else Color.White.copy(alpha = 0.16f), RoundedCornerShape(16.dp))
+            .padding(horizontal = 16.dp, vertical = 6.dp),
+    )
 }
 
 @Composable

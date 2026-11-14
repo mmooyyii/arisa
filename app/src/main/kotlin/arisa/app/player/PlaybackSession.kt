@@ -165,6 +165,8 @@ class PlaybackSession(
 
     val nextEpisode get() = currentEpisode?.let { episodes.getOrNull(episodes.indexOf(it) + 1) }
 
+    val previousEpisode get() = currentEpisode?.let { episodes.getOrNull(episodes.indexOf(it) - 1) }
+
     val title get() = item?.title ?: file.name
 
     val subtitle: String?
@@ -237,6 +239,13 @@ class PlaybackSession(
     fun playNext(): Boolean {
         val next = nextEpisode ?: return false
         open(fileOf(next), fromStart = true)
+        return true
+    }
+
+    /** 上一集从上次看到的地方接着播 (看完了的从头播). */
+    fun playPrevious(): Boolean {
+        val prev = previousEpisode ?: return false
+        playEpisode(prev)
         return true
     }
 

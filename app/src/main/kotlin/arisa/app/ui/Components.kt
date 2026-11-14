@@ -130,6 +130,9 @@ fun Backdrop(item: MediaItem?, modifier: Modifier = Modifier, dim: Float = 1f, s
                 return@collectLatest
             }
             revealing = false
+            // 先清零再放新图那一层: 上一次淡入结束时停在 1, 不清的话新图一下完就整张盖上来,
+            // 等到开始淡入又被清成透明, 看着是闪一下
+            fade.snapTo(0f)
             incoming = t
             delay(settleMs)
             // 开始淡入后就做完, 中途焦点又动了也不打断 (打断的话淡到一半的图会突然消失)

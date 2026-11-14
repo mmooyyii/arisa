@@ -30,9 +30,6 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.snapshots.Snapshot
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.flow.collectLatest
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
@@ -68,9 +65,6 @@ import arisa.library.tmdbImage
 private data class Shelf(val title: String, val filter: BrowseFilter, val cards: List<Card>, val total: Int)
 
 private const val SHELF_LIMIT = 20
-
-/** 焦点停多久才换上面的标题和简介. */
-private const val HERO_SETTLE_MS = 80L
 
 @Composable
 fun HomeScreen(
@@ -274,16 +268,7 @@ private fun HomeBackdrop(item: () -> MediaItem?) = Backdrop(item(), settleMs = 3
 
 @Composable
 private fun HeroInfo(item: () -> MediaItem?, modifier: Modifier = Modifier) {
-    // 按住方向键时焦点一秒过好几张卡片, 每张都换一遍标题、Logo、简介 (各起一次过渡动画、加载一张 Logo 图) 会掉帧;
-    // 焦点停下一小会儿才换, 单按一下感觉不出这点延迟
-    var shown by remember { mutableStateOf(Snapshot.withoutReadObservation(item)) }
-    LaunchedEffect(Unit) {
-        snapshotFlow(item).collectLatest {
-            delay(HERO_SETTLE_MS)
-            shown = it
-        }
-    }
-    val target = shown ?: return
+    val target = item() ?: return
     AnimatedContent(
         targetState = target,
         transitionSpec = { fadeIn(tween(400)) togetherWith fadeOut(tween(200)) },

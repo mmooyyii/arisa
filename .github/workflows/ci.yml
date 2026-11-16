@@ -19,8 +19,20 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
-      - name: 测试 + 编译
-        run: ./gradlew test :scraper:distZip :app:assembleDebug --stacktrace
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: scraper/go.mod
+          cache-dependency-path: scraper/go.sum
+      - name: 刮削器测试
+        working-directory: scraper
+        run: |
+          test -z "$(gofmt -l .)" || { gofmt -l .; echo "::error::代码没有 gofmt"; exit 1; }
+          go vet ./...
+          go test ./...
+      - name: 刮削器打包
+        run: sh scraper/packaging/package.sh
+      - name: App 测试 + 编译
+        run: ./gradlew test :app:assembleDebug --stacktrace
 
   # 打 v1.2.3 标签时发版: 刮削器 zip + TV App apk + latest.json.
   # 刮削器会自动更新到这里的最新版, TV App 由刮削器转存到网盘后在 TV 上手动更新.
@@ -42,6 +54,10 @@ jobs:
           distribution: temurin
           java-version: 21
       - uses: gradle/actions/setup-gradle@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: scraper/go.mod
+          cache-dependency-path: scraper/go.sum
 
       - name: 版本号和签名
         env:
@@ -55,7 +71,9 @@ jobs:
       - name: 打包
         env:
           ARISA_KEYSTORE_PASSWORD: ${{ secrets.ARISA_KEYSTORE_PASSWORD }}
-        run: ./gradlew :scraper:distZip :app:assembleRelease -Parisa.version="$VERSION" --stacktrace
+        run: |
+          sh scraper/packaging/package.sh "$VERSION"
+          ./gradlew :app:assembleRelease -Parisa.version="$VERSION" --stacktrace
 
       - name: 检查签名
         run: |
@@ -67,7 +85,7 @@ jobs:
       - name: 清单和更新说明
         run: |
           mkdir dist
-          cp scraper/build/distributions/arisa-scraper.zip "dist/arisa-scraper-$VERSION.zip"
+          cp scraper/build/arisa-scraper.zip "dist/arisa-scraper-$VERSION.zip"
           cp app/build/outputs/apk/release/app-release.apk "dist/arisa-$VERSION.apk"
           prev=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || true)
           git log --no-merges --format='- %s' ${prev:+$prev..}HEAD > notes.md

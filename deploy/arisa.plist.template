@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <!--
-  launchd 模板, deploy/install.sh 会填好并加载: __HOME__ 换成家目录, __JAVA_HOME__ 换成 JDK 17+ 的路径.
+  launchd 模板, deploy/install.sh 会填好并加载: __HOME__ 换成家目录.
   跑的是 ~/.arisa/current (指向 ~/.arisa/versions/<版本>), 自动更新换了链接后退出, KeepAlive 用新版拉起来.
 -->
 <plist version="1.0">
@@ -15,11 +15,8 @@
     </array>
     <key>EnvironmentVariables</key>
     <dict>
-        <!-- 要能找到 java 和 arisa-scraper -->
         <key>PATH</key>
         <string>__HOME__/.local/bin:/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string>
-        <key>JAVA_HOME</key>
-        <string>__JAVA_HOME__</string>
     </dict>
     <key>RunAtLoad</key>
     <true/>

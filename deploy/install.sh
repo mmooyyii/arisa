@@ -2,8 +2,8 @@
 # 在 mac mini 上安装刮削器 (之后由它自己自动更新).
 #   sh install.sh                 装 GitHub 上的最新版
 #   sh install.sh 0.2.0           装指定版本
-#   sh install.sh xxx.zip         装本地的包 (./gradlew :scraper:distZip 打出来的)
-# 需要 JDK 17+. GitHub 直连不稳时先 export https_proxy=http://127.0.0.1:7890
+#   sh install.sh xxx.zip         装本地的包 (sh scraper/packaging/package.sh 打出来的)
+# 不需要装别的运行环境. GitHub 直连不稳时先 export https_proxy=http://127.0.0.1:7890
 set -eu
 
 REPO=mmooyyii/arisa
@@ -12,9 +12,6 @@ VERSIONS=$ARISA_HOME/versions
 BIN_DIR=${BIN_DIR:-$HOME/.local/bin}
 TMP=$(mktemp -d)
 trap 'rm -rf "$TMP"' EXIT
-
-JAVA_HOME=${JAVA_HOME:-$(/usr/libexec/java_home -v 17+ 2>/dev/null || true)}
-[ -n "$JAVA_HOME" ] || { echo "找不到 JDK 17+, 先装一个 (brew install openjdk@21) 或设置 JAVA_HOME"; exit 1; }
 
 if [ $# -gt 0 ] && [ -f "$1" ]; then
     cp "$1" "$TMP/scraper.zip"
@@ -32,7 +29,10 @@ fi
 
 unzip -q "$TMP/scraper.zip" -d "$TMP/unpacked"
 dir=$(ls -d "$TMP"/unpacked/*/ | head -1)
-version=$(JAVA_HOME=$JAVA_HOME "$dir/bin/arisa-scraper" version | tail -1)
+chmod +x "$dir"/bin/*
+# 从网上下载的程序带隔离标记, 去掉免得 macOS 拦着不让运行
+xattr -dr com.apple.quarantine "$dir" 2>/dev/null || true
+version=$("$dir/bin/arisa-scraper" version | tail -1)
 mkdir -p "$VERSIONS" "$ARISA_HOME/logs" "$BIN_DIR"
 rm -rf "${VERSIONS:?}/$version"
 mv "$dir" "$VERSIONS/$version"
@@ -51,7 +51,7 @@ plist=$HOME/Library/LaunchAgents/com.arisa.scraper.plist
 mkdir -p "$(dirname "$plist")"
 curl -fsSL "https://raw.githubusercontent.com/$REPO/v$version/deploy/arisa.plist.template" -o "$TMP/plist" 2>/dev/null \
     || cp "$(dirname "$0")/arisa.plist.template" "$TMP/plist"
-sed -e "s|__HOME__|$HOME|g" -e "s|__JAVA_HOME__|$JAVA_HOME|g" "$TMP/plist" > "$plist"
+sed -e "s|__HOME__|$HOME|g" "$TMP/plist" > "$plist"
 launchctl bootout "gui/$(id -u)/com.arisa.scraper" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$plist"
 echo "常驻服务已启动, 管理网页 http://localhost:7893, 日志 $ARISA_HOME/logs/serve.log"

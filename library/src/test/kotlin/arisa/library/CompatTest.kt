@@ -25,6 +25,22 @@ class CompatTest {
         assertEquals(1000, manifest.versionCode)
     }
 
+    /** Go 版刮削器 (scraper/) 写出的索引, TV App 要能读、能搜. 样本由 scraper 的 TestWriteCompatSample 生成. */
+    @Test fun goScraperOutputReadable() {
+        val lib = LibraryCodec.json.decodeFromString(Library.serializer(), resource("library-schema1-go.json"))
+        assertEquals(Library.SCHEMA, lib.schema)
+        assertEquals(5, lib.items.size)
+        assertEquals(2, lib.collections.size)
+        assertEquals(1, lib.unmatched.size)
+        val show = lib.items.single { it.id == "tv:221851" }
+        assertEquals(MediaType.TV, show.type)
+        assertEquals(listOf(0, 1), show.seasons.map { it.number })
+        assertEquals("zh-Hans", show.seasons.single { it.number == 1 }.episodes.single().files.single().subtitles.single().language)
+        val search = LibrarySearch(lib)
+        assertEquals("tv:221851", (search.search("mcdjj").first() as LibrarySearch.Hit.Item).item.id)
+        assertTrue(search.search("liulangdiqiu").isNotEmpty())
+    }
+
     /**
      * 必填 (没有默认值) 的字段冻结在这里. 旧版写的文件里没有新字段, 新字段必须带默认值;
      * 旧版 App 读新文件时也只认这些必填字段, 不能删或改名.

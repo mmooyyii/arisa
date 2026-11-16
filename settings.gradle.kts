@@ -15,5 +15,4 @@ dependencyResolutionManagement {
 rootProject.name = "arisa"
 include(":quark")
 include(":library")
-include(":scraper")
 include(":app")

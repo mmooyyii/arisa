@@ -14,14 +14,14 @@ TV 和 mac mini 不直接通信, TV 只需要扫码登录夸克.
 
 | 模块        | 说明                                                                                                                                       |
 |-----------|------------------------------------------------------------------------------------------------------------------------------------------|
-| `quark`   | 夸克客户端. `QuarkTvClient`: TV 端开放接口 (扫码登录、列目录、直链、转码流); `QuarkWebClient`: 网页端 Cookie 接口 (额外支持上传/删除). 参考 OpenList 的 quark_uc_tv / quark_uc 驱动 |
+| `quark`   | 夸克客户端 (TV App 用). `QuarkTvClient`: TV 端开放接口 (扫码登录、列目录、直链、转码流); `QuarkWebClient`: 网页端 Cookie 接口 (额外支持上传/删除). 参考 OpenList 的 quark_uc_tv / quark_uc 驱动 |
 | `library` | 索引数据结构 `Library`, 两端共用                                                                                                                   |
-| `scraper` | 刮削器命令行, 跑在 mac mini 上                                                                                                                    |
+| `scraper` | 刮削器, 跑在 mac mini 上. Go 写的, 单个可执行文件, 不用装 Java; 夸克客户端在 `scraper/quark`                                                                 |
 | `app`     | 安卓 TV App (Compose for TV + Media3)                                                                                                      |
 
 ## 刮削器
 
-在 mac mini 上安装 (需要 JDK 17+), 装好后作为 launchd 常驻服务运行, 之后自动更新:
+在 mac mini 上安装 (不需要装别的运行环境), 装好后作为 launchd 常驻服务运行, 之后自动更新:
 
 ```sh
 curl -fsSL https://raw.githubusercontent.com/mmooyyii/arisa/main/deploy/install.sh | sh
@@ -36,11 +36,13 @@ launchctl kickstart -k gui/$(id -u)/com.arisa.scraper   # 重启服务, 管理�
 `arisa-scraper update` 马上检查一次; 配置见 `config.example.yaml` 的 `update`.
 新版出问题时可以手动切回上一版: `ln -sfn versions/<旧版本> ~/.arisa/current` 后重启服务.
 
-开发时直接用源码跑 (不会自动更新):
+开发时直接用源码跑 (不会自动更新), 需要 Go:
 
 ```sh
-./gradlew :scraper:installDist
-scraper/build/install/arisa-scraper/bin/arisa-scraper serve
+cd scraper
+go test ./...
+go run . serve                     # 或 go build -o arisa-scraper . && ./arisa-scraper serve
+sh packaging/package.sh            # 打安装包 scraper/build/arisa-scraper.zip
 ```
 
 常驻服务 (`serve`) 的流程:

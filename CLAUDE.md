@@ -24,6 +24,13 @@
    网盘目录 (`/.arisa/`, `/.arisa/app/`) 都不能改, 旧版本按这些地址找更新.
 5. `library/src/test/kotlin/arisa/library/CompatTest.kt` 守着这些规则: 旧版本的样本文件 (`src/test/resources/compat/`)
    只加不删, 格式有变化时把新版本写出的样本也加进去; 必填字段名单只能减不能加.
+6. 刮削器是 Go 写的 (`scraper/`), TV App 是 Kotlin. 片库索引和发布清单的结构两边各有一份:
+   `scraper/library.go` 和 `library/src/main/kotlin/arisa/library/Library.kt`、`Release.kt`, 改一边必须同步改另一边.
+   Go 这边默认值 (空列表、null) 用 omitempty 不写, 必填字段不能 omitempty.
+   改了 Go 写出的格式后重新生成样本: `cd scraper && ARISA_WRITE_COMPAT=../library/src/test/resources/compat/library-schema1-go.json go test -run TestWriteCompatSample .`,
+   再跑 `./gradlew :library:test` 确认 App 能读.
+7. 刮削器安装包的结构 (`scraper/packaging/package.sh`): zip 里一层 `arisa-scraper-<版本>/`, 下面 `bin/arisa-scraper` 能执行,
+   `bin/arisa-scraper version` 最后一行打印版本号. 自动更新、`deploy/install.sh` 都按这个装, 不能改.
 
 ## 发版
 
@@ -31,7 +38,7 @@
 git tag v0.2.0 && git push origin v0.2.0
 ```
 
-CI (`.github/workflows/ci.yml`) 打包刮削器和 App, 发 GitHub Release. 版本号只从标签来, 代码里不写死;
+CI (`.github/workflows/ci.yml`) 打包刮削器 (Go, 交叉编译 darwin arm64/amd64) 和 App, 发 GitHub Release. 版本号只从标签来, 代码里不写死;
 x.y.z 每段 0~999, 安卓 versionCode = x*1000000 + y*1000 + z, 只能变大.
 
 App 用 `~/.android/arisa-release.jks` 签名 (CI 里是 secret `ARISA_KEYSTORE_BASE64` / `ARISA_KEYSTORE_PASSWORD`),

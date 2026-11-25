@@ -66,11 +66,4 @@ class DownloadNodesTest {
         val none = DownloadNodes({ throw java.net.UnknownHostException() }, clock = { now })
         assertNull(none.pick())
     }
-
-    @Test fun summaryShowsNodesInUse() {
-        val a = nodes.pick()!!
-        nodes.release(a, 2 * 1048576L, 1000, bad = false)
-        val b = nodes.pick()!!
-        assertEquals(b.ip + if (b === a) " 2.0MB/s" else "", nodes.summary())
-    }
 }

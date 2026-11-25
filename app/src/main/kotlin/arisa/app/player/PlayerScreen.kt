@@ -332,8 +332,7 @@ fun PlayerScreen(session: PlaybackSession, onExit: () -> Unit) {
 
         if ((buffering || session.loading) && session.error == null) {
             Text(
-                "缓冲中…" + session.downloadRate.takeIf { it > 0 }?.let { " %.1f MB/s".format(it / 1048576.0) }.orEmpty() +
-                    session.downloadNodes.takeIf { it.isNotEmpty() }?.let { "\n" + it }.orEmpty(),
+                "缓冲中…" + session.downloadRate.takeIf { it > 0 }?.let { " %.1f MB/s".format(it / 1048576.0) }.orEmpty(),
                 style = MaterialTheme.typography.titleMedium,
                 modifier = Modifier.align(Alignment.Center).background(Color.Black.copy(alpha = 0.5f), RoundedCornerShape(8.dp)).padding(16.dp, 10.dp),
             )

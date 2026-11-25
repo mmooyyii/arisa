@@ -90,12 +90,6 @@ class DownloadNodes(
         return nodes.any { it !== node && it.avoidUntil <= now }
     }
 
-    /** 正在用的 IP 和量到的速度, 缓冲时显示. */
-    @Synchronized
-    fun summary(): String = nodes.filter { it.inUse > 0 }.joinToString("  ") { n ->
-        n.ip + if (n.measuredAt > 0) " %.1fMB/s".format(n.speed / 1048576.0) else ""
-    }
-
     /** 测试用: 所有 IP 的快照. */
     @Synchronized
     internal fun all(): List<Node> = nodes.toList()

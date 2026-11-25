@@ -93,12 +93,8 @@ class PlaybackSession(
         private set
     private val received = AtomicLong()
 
-    /** 正在连的下载服务器和速度, 缓冲时显示. */
-    var downloadNodes by mutableStateOf("")
-        private set
     /** 下载域名 → 它背后的服务器. 跟着这次播放走, 换集、出错重来都接着用量过的速度. */
     private val nodes = ConcurrentHashMap<String, DownloadNodes>()
-    private var currentNodes: DownloadNodes? = null
     /** 只连某一个 IP 的客户端. 共用 [ArisaApp.http] 的连接池, 但 Dns 不同, 连接不会混用. */
     private val nodeClients = ConcurrentHashMap<InetAddress, OkHttpClient>()
 
@@ -238,7 +234,6 @@ class PlaybackSession(
             while (isActive) {
                 delay(1000)
                 downloadRate = received.getAndSet(0)
-                downloadNodes = currentNodes?.summary().orEmpty()
             }
         }
     }
@@ -314,7 +309,6 @@ class PlaybackSession(
             }
             val host = Uri.parse(link.url).host
             val hostNodes = host?.let { h -> nodes.getOrPut(h) { DownloadNodes({ InetAddress.getAllByName(h).toList() }) } }
-            currentNodes = hostNodes
             val connector = ParallelRangeDataSource.Connector { ip ->
                 OkHttpDataSource.Factory(if (ip == null) app.http else clientFor(ip))
                     .setDefaultRequestProperties(link.headers)

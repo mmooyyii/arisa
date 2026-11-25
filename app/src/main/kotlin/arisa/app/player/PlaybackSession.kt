@@ -4,6 +4,12 @@ import androidx.media3.datasource.TransferListener
 import androidx.media3.datasource.DataSpec
 import androidx.media3.datasource.DataSource
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.TimeUnit
+import java.net.InetAddress
+import android.util.Log
+import okhttp3.Dns
+import okhttp3.OkHttpClient
 import android.content.Context
 import android.net.Uri
 import androidx.annotation.OptIn
@@ -86,6 +92,25 @@ class PlaybackSession(
     var downloadRate by mutableStateOf(0L)
         private set
     private val received = AtomicLong()
+
+    /** 正在连的下载服务器和速度, 缓冲时显示. */
+    var downloadNodes by mutableStateOf("")
+        private set
+    /** 下载域名 → 它背后的服务器. 跟着这次播放走, 换集、出错重来都接着用量过的速度. */
+    private val nodes = ConcurrentHashMap<String, DownloadNodes>()
+    private var currentNodes: DownloadNodes? = null
+    /** 只连某一个 IP 的客户端. 共用 [ArisaApp.http] 的连接池, 但 Dns 不同, 连接不会混用. */
+    private val nodeClients = ConcurrentHashMap<InetAddress, OkHttpClient>()
+
+    private fun clientFor(ip: InetAddress): OkHttpClient = nodeClients.getOrPut(ip) {
+        app.http.newBuilder()
+            .dns(object : Dns {
+                override fun lookup(hostname: String) = listOf(ip)
+            })
+            // 换节点靠分段下载里的检查线程; 等响应头的时候它管不到, 读超时短一点, 别在一个连不动的节点上等一分钟
+            .readTimeout(10, TimeUnit.SECONDS)
+            .build()
+    }
     private val transfers = object : TransferListener {
         override fun onTransferInitializing(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {}
         override fun onTransferStart(source: DataSource, dataSpec: DataSpec, isNetwork: Boolean) {}
@@ -213,6 +238,7 @@ class PlaybackSession(
             while (isActive) {
                 delay(1000)
                 downloadRate = received.getAndSet(0)
+                downloadNodes = currentNodes?.summary().orEmpty()
             }
         }
     }
@@ -286,7 +312,15 @@ class PlaybackSession(
                     .setLabel("外挂 " + s.name.substringBeforeLast('.').takeLast(24))
                     .build()
             }
-            val http = OkHttpDataSource.Factory(app.http).setDefaultRequestProperties(link.headers).setTransferListener(transfers)
+            val host = Uri.parse(link.url).host
+            val hostNodes = host?.let { h -> nodes.getOrPut(h) { DownloadNodes({ InetAddress.getAllByName(h).toList() }) } }
+            currentNodes = hostNodes
+            val connector = ParallelRangeDataSource.Connector { ip ->
+                OkHttpDataSource.Factory(if (ip == null) app.http else clientFor(ip))
+                    .setDefaultRequestProperties(link.headers)
+                    .setTransferListener(transfers)
+                    .createDataSource()
+            }
             val media = MediaItem.Builder()
                 .setUri(link.url)
                 .setMediaId(f.fid)
@@ -295,7 +329,7 @@ class PlaybackSession(
                 .build()
             // 网络部分分段并发读 (夸克对不分段的请求限速); 外面包一层, 外挂字幕从本地缓存读
             val source = PendingSubtitleDataSource.Factory(
-                ParallelRangeDataSource.Factory(http, link.size),
+                ParallelRangeDataSource.Factory(connector, link.size, hostNodes) { Log.i(LOG_TAG, it) },
                 sideloaded.associate { (s, _, pending) -> s.fid to pending },
             )
             player.setMediaSource(DefaultMediaSourceFactory(source).createMediaSource(media), positionMs)
@@ -450,6 +484,8 @@ class PlaybackSession(
 
     private companion object {
         const val MAX_DELAY_MS = 30_000L
+        /** 分段下载每个连接一行: `adb logcat -s ArisaDownload` */
+        const val LOG_TAG = "ArisaDownload"
     }
 }
 

@@ -194,20 +194,26 @@ func (u *Updater) mirrorApp(m ReleaseManifest, apk ReleaseAsset) error {
 	if _, err := u.drive.Upload(dir, ReleaseFile, body); err != nil {
 		return err
 	}
-	// 旧 APK 只留上一个版本
-	var oldApks []struct {
-		fid string
-		at  int64
+	// 旧 APK 只留上一个版本. 按文件名里的版本号排, 版本号认不出的按上传时间;
+	// 只按上传时间的话, 同一秒传的几个 (测试里就是) 谁新谁旧说不准
+	type oldApk struct {
+		fid  string
+		code int
+		at   int64
 	}
+	var oldApks []oldApk
 	for _, f := range files {
 		if strings.HasSuffix(f.Name, ".apk") && f.Name != apk.Name {
-			oldApks = append(oldApks, struct {
-				fid string
-				at  int64
-			}{f.Fid, f.UpdatedAt})
+			code := VersionCode(strings.TrimSuffix(strings.TrimPrefix(f.Name, "arisa-"), ".apk"))
+			oldApks = append(oldApks, oldApk{f.Fid, code, f.UpdatedAt})
 		}
 	}
-	sort.SliceStable(oldApks, func(i, j int) bool { return oldApks[i].at > oldApks[j].at })
+	sort.SliceStable(oldApks, func(i, j int) bool {
+		if oldApks[i].code != oldApks[j].code {
+			return oldApks[i].code > oldApks[j].code
+		}
+		return oldApks[i].at > oldApks[j].at
+	})
 	var del []string
 	for i, a := range oldApks {
 		if i >= 1 {
